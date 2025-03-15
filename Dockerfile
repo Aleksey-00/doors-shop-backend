@@ -40,14 +40,13 @@ ENV DB_NAME=railway
 ENV RAILWAY_ENVIRONMENT=true
 
 # Создаем скрипт для запуска приложения с миграциями
-RUN echo '#!/bin/sh\n\
-echo "Running migrations..."\n\
-npm run migration:run\n\
-echo "Starting application..."\n\
-node dist/src/main.js' > /app/start.sh
+RUN printf '#!/bin/sh\necho "Running migrations..."\nnpm run migration:run\necho "Starting application..."\nnode dist/src/main.js\n' > /app/start.sh
 
 # Делаем скрипт исполняемым
 RUN chmod +x /app/start.sh
+
+# Проверяем, что скрипт создан и имеет права на выполнение
+RUN ls -la /app/start.sh
 
 # Запускаем приложение через скрипт
 CMD ["/app/start.sh"] 
