@@ -19,6 +19,7 @@ RUN npm run build
 
 # Проверяем, что dist директория создана и содержит main.js
 RUN ls -la dist
+RUN ls -la dist/src
 
 # Открываем порт
 EXPOSE 9090
@@ -28,4 +29,4 @@ ENV NODE_ENV=production
 ENV PORT=9090
 
 # Запускаем приложение
-CMD ["node", "dist/main.js"] 
+CMD ["node", "dist/src/main.js"] 
