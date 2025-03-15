@@ -27,7 +27,7 @@ import './polyfills';
         console.log('DB_NAME:', configService.get('DB_NAME'));
         console.log('NODE_ENV:', configService.get('NODE_ENV'));
         
-        // Принудительно используем DATABASE_URL для Railway.app
+        // Проверяем, запущено ли приложение на Railway
         const isRailway = process.env.RAILWAY_ENVIRONMENT === 'production' || 
                           process.env.RAILWAY_PROJECT_ID || 
                           process.env.RAILWAY_SERVICE_ID;
@@ -51,9 +51,27 @@ import './polyfills';
             }
           };
         } else if (isRailway) {
-          // Если мы на Railway, но DATABASE_URL не предоставлен, выводим ошибку
-          console.error('ERROR: Running on Railway but DATABASE_URL is not provided!');
-          throw new Error('DATABASE_URL is required when running on Railway');
+          // Если мы на Railway, но DATABASE_URL не предоставлен, выводим предупреждение
+          console.warn('WARNING: Running on Railway but DATABASE_URL is not provided!');
+          console.log('Trying to use individual connection parameters instead');
+          
+          // Используем отдельные параметры подключения
+          return {
+            type: 'postgres',
+            host: configService.get('DB_HOST') || 'localhost',
+            port: +(configService.get('DB_PORT') || 5432),
+            username: configService.get('DB_USERNAME') || 'postgres',
+            password: configService.get('DB_PASSWORD') || 'postgres',
+            database: configService.get('DB_NAME') || 'doors_repair',
+            entities: [__dirname + '/**/*.entity{.ts,.js}'],
+            synchronize: configService.get('NODE_ENV') !== 'production',
+            ssl: { rejectUnauthorized: false },
+            logging: true,
+            extra: { 
+              connectionTimeoutMillis: 5000,
+              query_timeout: 10000
+            }
+          };
         }
         
         // Иначе используем отдельные параметры подключения
