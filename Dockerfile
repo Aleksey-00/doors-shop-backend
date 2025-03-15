@@ -40,10 +40,8 @@ ENV DB_NAME=railway
 ENV RAILWAY_ENVIRONMENT=true
 
 # Добавляем переменные окружения для Redis
-ENV REDIS_ENABLED=true
-ENV REDIS_URL=redis://default:mtUQxXvFcfAWLxbmhGiSomzsNvPCpiBl@redis.railway.internal:6379
-ENV REDIS_HOST=redis.railway.internal
-ENV REDIS_PORT=6379
+# При локальном запуске отключаем Redis, чтобы избежать ошибок
+ENV REDIS_ENABLED=false
 
 # Создаем скрипт для запуска приложения с миграциями
 RUN printf '#!/bin/sh\necho "Running migrations..."\nnpm run migration:run\necho "Starting application..."\nnode dist/src/main.js\n' > /app/start.sh
@@ -55,4 +53,4 @@ RUN chmod +x /app/start.sh
 RUN ls -la /app/start.sh
 
 # Запускаем приложение через скрипт
-CMD ["/app/start.sh"] 
+CMD ["/app/start.sh"]
