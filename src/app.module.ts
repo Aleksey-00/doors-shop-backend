@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ParsersModule } from './parsers/parsers.module';
 import { CategoriesModule } from './categories/categories.module';
+import './polyfills';
 
 @Module({
   imports: [
