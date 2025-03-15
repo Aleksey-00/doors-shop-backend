@@ -32,12 +32,22 @@ ENV PORT=9090
 # Эти значения будут переопределены при запуске контейнера
 # через переменные окружения Railway
 ENV DATABASE_URL=postgresql://postgres:lXVEBBhgcJwsNwsQbxyfiAtIxiUmuGiO@mainline.proxy.rlwy.net:43206/railway
-ENV DB_HOST=localhost
-ENV DB_PORT=5432
+ENV DB_HOST=mainline.proxy.rlwy.net
+ENV DB_PORT=43206
 ENV DB_USERNAME=postgres
-ENV DB_PASSWORD=postgres
-ENV DB_NAME=doors_repair
-ENV RAILWAY_ENVIRONMENT=false
+ENV DB_PASSWORD=lXVEBBhgcJwsNwsQbxyfiAtIxiUmuGiO
+ENV DB_NAME=railway
+ENV RAILWAY_ENVIRONMENT=true
 
-# Запускаем приложение
-CMD ["node", "dist/src/main.js"] 
+# Создаем скрипт для запуска приложения с миграциями
+RUN echo '#!/bin/sh\n\
+echo "Running migrations..."\n\
+npm run migration:run\n\
+echo "Starting application..."\n\
+node dist/src/main.js' > /app/start.sh
+
+# Делаем скрипт исполняемым
+RUN chmod +x /app/start.sh
+
+# Запускаем приложение через скрипт
+CMD ["/app/start.sh"] 
