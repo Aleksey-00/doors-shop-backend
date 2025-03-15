@@ -43,7 +43,7 @@ import './polyfills';
         };
       },
       inject: [ConfigService],
-    })
+    }),
     ScheduleModule.forRoot(),
     DoorsModule,
     OrdersModule,
