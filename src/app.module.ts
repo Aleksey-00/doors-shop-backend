@@ -27,7 +27,13 @@ import './polyfills';
         console.log('DB_NAME:', configService.get('DB_NAME'));
         console.log('NODE_ENV:', configService.get('NODE_ENV'));
         
+        // Принудительно используем DATABASE_URL для Railway.app
+        const isRailway = process.env.RAILWAY_ENVIRONMENT === 'production' || 
+                          process.env.RAILWAY_PROJECT_ID || 
+                          process.env.RAILWAY_SERVICE_ID;
+        
         const databaseUrl = configService.get('DATABASE_URL');
+        
         if (databaseUrl) {
           // Используем URL-строку подключения, если она предоставлена
           console.log('Using DATABASE_URL for connection');
@@ -44,6 +50,10 @@ import './polyfills';
               query_timeout: 10000
             }
           };
+        } else if (isRailway) {
+          // Если мы на Railway, но DATABASE_URL не предоставлен, выводим ошибку
+          console.error('ERROR: Running on Railway but DATABASE_URL is not provided!');
+          throw new Error('DATABASE_URL is required when running on Railway');
         }
         
         // Иначе используем отдельные параметры подключения

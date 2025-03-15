@@ -22,7 +22,9 @@
     "migration:run": "ts-node ./node_modules/typeorm/cli.js migration:run -d ./typeorm.config.ts",
     "migration:revert": "ts-node ./node_modules/typeorm/cli.js migration:revert -d ./typeorm.config.ts",
     "migration:generate": "ts-node ./node_modules/typeorm/cli.js migration:generate ./src/migrations/migration -d ./typeorm.config.ts",
-    "create-admin": "ts-node src/scripts/create-admin.ts"
+    "create-admin": "ts-node src/scripts/create-admin.ts",
+    "test:db": "ts-node src/db-test.ts",
+    "test:env": "ts-node src/env-test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
