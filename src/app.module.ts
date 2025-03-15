@@ -18,28 +18,52 @@ import './polyfills';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
+        console.log('Environment variables:');
+        console.log('DATABASE_URL:', configService.get('DATABASE_URL'));
+        console.log('DB_HOST:', configService.get('DB_HOST'));
+        console.log('DB_PORT:', configService.get('DB_PORT'));
+        console.log('DB_USERNAME:', configService.get('DB_USERNAME'));
+        console.log('DB_PASSWORD:', configService.get('DB_PASSWORD') ? '[REDACTED]' : undefined);
+        console.log('DB_NAME:', configService.get('DB_NAME'));
+        console.log('NODE_ENV:', configService.get('NODE_ENV'));
+        
         const databaseUrl = configService.get('DATABASE_URL');
         if (databaseUrl) {
           // Используем URL-строку подключения, если она предоставлена
+          console.log('Using DATABASE_URL for connection');
           return {
             type: 'postgres',
             url: databaseUrl,
             entities: [__dirname + '/**/*.entity{.ts,.js}'],
             synchronize: configService.get('NODE_ENV') !== 'production',
             ssl: { rejectUnauthorized: false },
+            logging: true, // Включаем логирование SQL-запросов
+            extra: { 
+              // Дополнительные параметры для отладки
+              connectionTimeoutMillis: 5000,
+              query_timeout: 10000
+            }
           };
         }
         
         // Иначе используем отдельные параметры подключения
+        console.log('Using individual connection parameters');
         return {
           type: 'postgres',
-          host: configService.get('DB_HOST'),
-          port: +configService.get('DB_PORT'),
-          username: configService.get('DB_USERNAME'),
-          password: configService.get('DB_PASSWORD'),
-          database: configService.get('DB_NAME'),
+          host: configService.get('DB_HOST') || 'localhost',
+          port: +(configService.get('DB_PORT') || 5432),
+          username: configService.get('DB_USERNAME') || 'postgres',
+          password: configService.get('DB_PASSWORD') || 'postgres',
+          database: configService.get('DB_NAME') || 'doors_repair',
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: configService.get('NODE_ENV') !== 'production',
+          logging: true, // Включаем логирование SQL-запросов
+          ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
+          extra: { 
+            // Дополнительные параметры для отладки
+            connectionTimeoutMillis: 5000,
+            query_timeout: 10000
+          }
         };
       },
       inject: [ConfigService],
