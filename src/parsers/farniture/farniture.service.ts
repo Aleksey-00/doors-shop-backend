@@ -27,6 +27,7 @@ export class FarnitureService implements OnModuleInit {
     'labirint',
     'bunker'
   ];
+  private redisEnabled = true;
 
   constructor(
     @InjectRepository(Door)
@@ -44,6 +45,12 @@ export class FarnitureService implements OnModuleInit {
         this.logger.error(`[Constructor] Database connection error: ${error.message}`);
         this.logger.error(`[Constructor] Full error stack: ${error.stack}`);
       });
+      
+    // Проверяем, включен ли Redis
+    this.redisEnabled = process.env.REDIS_ENABLED !== 'false';
+    if (!this.redisEnabled) {
+      this.logger.warn('[Constructor] Redis is disabled by environment variable REDIS_ENABLED=false');
+    }
   }
 
   async onModuleInit() {
@@ -54,13 +61,23 @@ export class FarnitureService implements OnModuleInit {
       const doorsCount = await this.doorRepository.count();
       this.logger.log(`[Init] Found ${doorsCount} doors in database`);
 
-      // Проверяем наличие дверей в Redis
-      const redisKeys = await this.redisService['client'].keys('door:*');
-      this.logger.log(`[Init] Found ${redisKeys.length} doors in Redis`);
+      // Проверяем наличие дверей в Redis, только если Redis включен
+      let redisKeys: string[] = [];
+      if (this.redisEnabled && this.redisService['client']) {
+        try {
+          redisKeys = await this.redisService['client'].keys('door:*');
+          this.logger.log(`[Init] Found ${redisKeys.length} doors in Redis`);
+        } catch (error) {
+          this.logger.error(`[Init] Error accessing Redis: ${error.message}`);
+          this.redisEnabled = false;
+        }
+      } else {
+        this.logger.log('[Init] Redis is disabled or not available, skipping Redis checks');
+      }
 
       let shouldStartParser = false;
 
-      if (doorsCount === 0 && redisKeys.length > 0) {
+      if (doorsCount === 0 && this.redisEnabled && redisKeys.length > 0) {
         // Если база пуста, но есть данные в Redis - восстанавливаем из Redis
         this.logger.log('[Init] Database is empty but Redis has data, restoring from Redis...');
         await this.restoreFromRedis();
@@ -71,31 +88,39 @@ export class FarnitureService implements OnModuleInit {
           this.logger.warn('[Init] Failed to restore from Redis, will start parser');
           shouldStartParser = true;
         }
-      } else if (doorsCount === 0 && redisKeys.length === 0) {
-        // Если нет данных ни в базе, ни в Redis
+      } else if (doorsCount === 0) {
+        // Если нет данных в базе или Redis отключен
         shouldStartParser = true;
       }
 
       if (shouldStartParser) {
-        this.logger.log('[Init] No doors found in database and Redis, starting parser');
+        this.logger.log('[Init] No doors found in database or Redis is disabled, starting parser');
         await this.parseAndSaveDoors();
       } else {
-        this.logger.log(`[Init] Skipping parsing - found ${doorsCount} doors in database and ${redisKeys.length} in Redis`);
+        this.logger.log(`[Init] Skipping parsing - found ${doorsCount} doors in database`);
       }
 
       // Устанавливаем ежедневную проверку
       const interval = setInterval(async () => {
         const dbCount = await this.doorRepository.count();
-        const redisCount = (await this.redisService['client'].keys('door:*')).length;
+        let redisCount = 0;
         
-        if (dbCount === 0 && redisCount > 0) {
+        if (this.redisEnabled && this.redisService['client']) {
+          try {
+            redisCount = (await this.redisService['client'].keys('door:*')).length;
+          } catch (error) {
+            this.logger.error(`[Daily] Error accessing Redis: ${error.message}`);
+          }
+        }
+        
+        if (dbCount === 0 && this.redisEnabled && redisCount > 0) {
           this.logger.log('[Daily] Database is empty but Redis has data, restoring from Redis...');
           await this.restoreFromRedis();
-        } else if (dbCount === 0 && redisCount === 0) {
+        } else if (dbCount === 0) {
           this.logger.log('[Daily] No doors found, starting parser');
           await this.parseAndSaveDoors();
         } else {
-          this.logger.log(`[Daily] Skipping parsing - found ${dbCount} doors in database and ${redisCount} in Redis`);
+          this.logger.log(`[Daily] Skipping parsing - found ${dbCount} doors in database`);
         }
       }, 24 * 60 * 60 * 1000);
 
@@ -110,9 +135,17 @@ export class FarnitureService implements OnModuleInit {
     try {
       // Двойная проверка перед парсингом
       const dbCount = await this.doorRepository.count();
-      const redisCount = (await this.redisService['client'].keys('door:*')).length;
+      let redisCount = 0;
+      
+      if (this.redisEnabled && this.redisService['client']) {
+        try {
+          redisCount = (await this.redisService['client'].keys('door:*')).length;
+        } catch (error) {
+          this.logger.error(`[Parser] Error accessing Redis: ${error.message}`);
+        }
+      }
 
-      if (dbCount > 0 || redisCount > 0) {
+      if (dbCount > 0 || (this.redisEnabled && redisCount > 0)) {
         this.logger.warn(`[Parser] Skipping parse - found ${dbCount} doors in database and ${redisCount} in Redis`);
         return;
       }
@@ -122,7 +155,15 @@ export class FarnitureService implements OnModuleInit {
       
       // Проверяем результаты сохранения
       const savedDbCount = await this.doorRepository.count();
-      const savedRedisCount = (await this.redisService['client'].keys('door:*')).length;
+      let savedRedisCount = 0;
+      
+      if (this.redisEnabled && this.redisService['client']) {
+        try {
+          savedRedisCount = (await this.redisService['client'].keys('door:*')).length;
+        } catch (error) {
+          this.logger.error(`[Parser] Error accessing Redis: ${error.message}`);
+        }
+      }
       
       this.logger.log(`[Parser] Parsing results:
         - Total parsed: ${parsedDoors.length} doors
@@ -201,14 +242,20 @@ export class FarnitureService implements OnModuleInit {
             savedDoorsCount++;
             this.logger.log(`[Parser] Successfully saved door to DB: ${doorData.title} (${externalId})`);
 
-            // Сохраняем в Redis
-            const doorHash = this.getDoorHashData(doorData);
-            await this.redisService.set(
-              `door:${externalId}`,
-              JSON.stringify(doorHash)
-            );
-            
-            this.logger.log(`[Parser] Successfully saved door to Redis: ${doorData.title} (${externalId})`);
+            // Сохраняем в Redis, только если Redis включен
+            if (this.redisEnabled && this.redisService['client']) {
+              try {
+                const doorHash = this.getDoorHashData(doorData);
+                await this.redisService.set(
+                  `door:${externalId}`,
+                  JSON.stringify(doorHash)
+                );
+                
+                this.logger.log(`[Parser] Successfully saved door to Redis: ${doorData.title} (${externalId})`);
+              } catch (error) {
+                this.logger.error(`[Parser] Error saving door to Redis: ${error.message}`);
+              }
+            }
           } catch (error) {
             this.logger.error(`[Parser] Error saving door ${doorData.title}: ${error.message}`);
             this.logger.error(error.stack);
@@ -438,6 +485,11 @@ export class FarnitureService implements OnModuleInit {
   }
 
   private async restoreFromRedis(): Promise<void> {
+    if (!this.redisEnabled || !this.redisService['client']) {
+      this.logger.warn('[Redis Restore] Redis is disabled or not available, skipping restoration');
+      return;
+    }
+    
     try {
       this.logger.log('[Redis Restore] Starting restoration from Redis...');
       

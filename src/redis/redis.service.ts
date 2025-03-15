@@ -16,12 +16,24 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
     
     try {
-      this.client = new Redis({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-      });
+      // Проверяем наличие REDIS_URL
+      if (process.env.REDIS_URL) {
+        this.logger.log(`Connecting to Redis using URL: ${process.env.REDIS_URL.replace(/\/\/.*:(.*)@/, '//***:***@')}`);
+        this.client = new Redis(process.env.REDIS_URL);
+      } else {
+        // Используем отдельные параметры подключения
+        const host = process.env.REDIS_HOST || 'localhost';
+        const port = parseInt(process.env.REDIS_PORT || '6379');
+        this.logger.log(`Connecting to Redis using host: ${host}, port: ${port}`);
+        this.client = new Redis({
+          host,
+          port,
+        });
+      }
       
-      this.logger.log(`Redis connected to ${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`);
+      // Проверяем подключение
+      await this.client.ping();
+      this.logger.log('Successfully connected to Redis');
     } catch (error) {
       this.logger.error(`Failed to connect to Redis: ${error.message}`);
       this.redisEnabled = false;
