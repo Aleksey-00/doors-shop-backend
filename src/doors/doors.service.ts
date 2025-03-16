@@ -185,7 +185,9 @@ export class DoorsService {
             // Генерируем UUID и берем первые 7 символов
             const uuid = require('crypto').randomUUID().substring(0, 7);
             // Добавляем UUID к замененному тексту
-            const newTitle = door.title.replace(searchText, `${replaceText} ${uuid}`);
+            // Используем регулярное выражение для замены всех вхождений
+            const regex = new RegExp(searchText, 'g');
+            const newTitle = door.title.replace(regex, `${replaceText} ${uuid}`);
             door.title = newTitle;
             await this.doorRepository.save(door);
             
