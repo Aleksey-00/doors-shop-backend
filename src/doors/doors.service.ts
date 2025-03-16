@@ -171,7 +171,7 @@ export class DoorsService {
     }
   }
 
-  async updateTitlesInCategory(category: string, searchText: string, replaceText: string): Promise<void> {
+  async updateTitlesInCategory(category: string, searchText: string, replaceText: string) {
     try {
       const doors = await this.doorRepository.find({
         where: { category },
@@ -224,10 +224,11 @@ export class DoorsService {
       }
       
       this.logger.log(`Successfully updated titles in category "${category}"`);
+      return { success: true, message: `Заголовки успешно обновлены в категории "${category || 'все категории'}"` };
     } catch (error) {
       this.logger.error(`Error in updateTitlesInCategory: ${error.message}`);
       this.logger.error(error.stack);
-      throw error;
+      return { success: false, message: `Ошибка при обновлении заголовков: ${error.message}` };
     }
   }
 
@@ -260,11 +261,11 @@ export class DoorsService {
       }
       
       this.logger.log(`Successfully updated prices for ${doors.length} doors`);
-      return { message: 'Цены успешно обновлены' };
+      return { success: true, message: `Цены успешно обновлены${category ? ` в категории "${category}"` : ' во всех категориях'}` };
     } catch (error) {
       this.logger.error(`Error in updatePrices: ${error.message}`);
       this.logger.error(error.stack);
-      throw error;
+      return { success: false, message: `Ошибка при обновлении цен: ${error.message}` };
     }
   }
 } 
