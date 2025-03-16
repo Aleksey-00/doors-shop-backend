@@ -19,4 +19,13 @@ export const databaseConfig: TypeOrmModuleOptions = {
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   migrationsRun: true,
+  extra: {
+    statement_timeout: 10000,
+    idle_in_transaction_session_timeout: 10000,
+    max_connections: 20,
+    connectionTimeoutMillis: 10000,
+  },
+  retryAttempts: 10,
+  retryDelay: 3000,
+  autoLoadEntities: true,
 }; 

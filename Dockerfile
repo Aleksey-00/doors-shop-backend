@@ -31,11 +31,11 @@ ENV PORT=9090
 # Добавляем переменные окружения для базы данных
 # Эти значения будут переопределены при запуске контейнера
 # через переменные окружения Railway
-ENV DATABASE_URL=postgresql://postgres:lXVEBBhgcJwsNwsQbxyfiAtIxiUmuGiO@mainline.proxy.rlwy.net:43206/railway
-ENV DB_HOST=mainline.proxy.rlwy.net
-ENV DB_PORT=43206
+ENV DATABASE_URL=postgresql://postgres:xnDGKbHcStpNXXgPnsBRHGIIhnQtpros@ballast.proxy.rlwy.net:17310/railway
+ENV DB_HOST=ballast.proxy.rlwy.net
+ENV DB_PORT=17310
 ENV DB_USERNAME=postgres
-ENV DB_PASSWORD=lXVEBBhgcJwsNwsQbxyfiAtIxiUmuGiO
+ENV DB_PASSWORD=xnDGKbHcStpNXXgPnsBRHGIIhnQtpros
 ENV DB_NAME=railway
 ENV RAILWAY_ENVIRONMENT=true
 
