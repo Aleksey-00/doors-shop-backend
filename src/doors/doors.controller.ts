@@ -59,7 +59,20 @@ export class DoorsController {
   async updatePrices(
     @Body() updateData: { category?: string; increasePercent: number }
   ) {
-    return this.doorsService.updatePrices(updateData.category, updateData.increasePercent);
+    try {
+      if (!updateData) {
+        return { success: false, message: 'Не указаны данные для обновления цен' };
+      }
+      
+      if (updateData.increasePercent === undefined) {
+        return { success: false, message: 'Не указан процент увеличения цен' };
+      }
+      
+      return this.doorsService.updatePrices(updateData.category, updateData.increasePercent);
+    } catch (error) {
+      console.error('Error in updatePrices:', error);
+      return { success: false, message: `Ошибка при обновлении цен: ${error.message}` };
+    }
   }
 
   @Post()
@@ -73,11 +86,10 @@ export class DoorsController {
   async updateTitles(
     @Body() updateData: { category: string; searchText: string; replaceText: string },
   ) {
-    await this.doorsService.updateTitlesInCategory(
+    return this.doorsService.updateTitlesInCategory(
       updateData.category,
       updateData.searchText,
       updateData.replaceText,
     );
-    return { success: true };
   }
 } 
