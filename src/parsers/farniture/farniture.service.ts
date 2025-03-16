@@ -57,6 +57,14 @@ export class FarnitureService implements OnModuleInit {
     try {
       this.logger.log('=== Starting FarnitureService initialization ===');
       
+      // Проверяем структуру таблицы
+      try {
+        const tableInfo = await this.doorRepository.query('SELECT column_name, data_type FROM information_schema.columns WHERE table_name = \'doors\'');
+        this.logger.log(`[Init] Table structure: ${JSON.stringify(tableInfo)}`);
+      } catch (error) {
+        this.logger.error(`[Init] Error checking table structure: ${error.message}`);
+      }
+      
       // Проверяем наличие дверей в базе данных
       const doorsCount = await this.doorRepository.count();
       this.logger.log(`[Init] Found ${doorsCount} doors in database`);
@@ -126,7 +134,7 @@ export class FarnitureService implements OnModuleInit {
 
       this.schedulerRegistry.addInterval('daily-parsing', interval);
     } catch (error) {
-      this.logger.error('[Init] Error in onModuleInit:', error);
+      this.logger.error('[Init] Error during initialization:', error);
       throw error;
     }
   }
@@ -151,7 +159,29 @@ export class FarnitureService implements OnModuleInit {
       }
 
       this.logger.log('[Parser] Starting doors parsing...');
-      const parsedDoors = await this.parseAllCategories();
+      
+      // Добавляем обработку каждой категории отдельно с повторными попытками
+      let totalParsedDoors = 0;
+      let totalSavedDoors = 0;
+      
+      for (const category of this.categories) {
+        try {
+          this.logger.log(`[Parser] Starting to parse category: ${category}`);
+          const doors = await this.parseCategory(category);
+          
+          // Сразу сохраняем двери из этой категории
+          if (doors.length > 0) {
+            this.logger.log(`[Parser] Saving ${doors.length} doors from category ${category}`);
+            const savedCount = await this.saveDoors(doors);
+            totalParsedDoors += doors.length;
+            totalSavedDoors += savedCount;
+          }
+        } catch (error) {
+          this.logger.error(`[Parser] Error parsing category ${category}: ${error.message}`);
+          // Продолжаем с следующей категорией
+          continue;
+        }
+      }
       
       // Проверяем результаты сохранения
       const savedDbCount = await this.doorRepository.count();
@@ -166,12 +196,14 @@ export class FarnitureService implements OnModuleInit {
       }
       
       this.logger.log(`[Parser] Parsing results:
-        - Total parsed: ${parsedDoors.length} doors
+        - Total parsed: ${totalParsedDoors} doors
+        - Total saved: ${totalSavedDoors} doors
         - Saved in database: ${savedDbCount} doors
         - Saved in Redis: ${savedRedisCount} doors`);
         
       return { 
-        totalDoors: parsedDoors.length,
+        totalDoors: totalParsedDoors,
+        savedDoors: totalSavedDoors,
         savedInDb: savedDbCount,
         savedInRedis: savedRedisCount
       };
@@ -179,6 +211,61 @@ export class FarnitureService implements OnModuleInit {
       this.logger.error('[Parser] Error during parsing:', error);
       throw error;
     }
+  }
+
+  private async saveDoors(doors: IDoor[]): Promise<number> {
+    let savedCount = 0;
+    
+    for (const doorData of doors) {
+      try {
+        const externalId = this.generateExternalId(doorData);
+        
+        // Проверяем обязательные поля
+        if (!doorData.title || !doorData.price || !doorData.category || !doorData.url) {
+          this.logger.error(`[Parser] Missing required fields for door: ${JSON.stringify(doorData)}`);
+          continue;
+        }
+
+        // Подготавливаем данные для сохранения
+        const doorToSave = {
+          ...doorData,
+          externalId,
+          imageUrls: doorData.imageUrls || [],
+          inStock: doorData.inStock || false,
+          description: doorData.description || '',
+          specifications: doorData.specifications || {},
+        };
+
+        // Сохраняем в базу данных
+        const savedDoor = await this.doorRepository.save(doorToSave);
+        
+        if (!savedDoor || !savedDoor.id) {
+          this.logger.error(`[Parser] Failed to save door ${doorData.title} to database`);
+          continue;
+        }
+
+        savedCount++;
+        this.logger.log(`[Parser] Successfully saved door to DB: ${doorData.title} (${externalId})`);
+        
+        // Сохраняем в Redis, если он включен
+        if (this.redisEnabled) {
+          try {
+            const doorHash = this.getDoorHashData(doorData);
+            const redisKey = `door:${externalId}`;
+            await this.redisService.set(redisKey, JSON.stringify(doorData));
+            this.logger.debug(`[Parser] Saved door to Redis: ${redisKey}`);
+          } catch (error) {
+            this.logger.error(`[Parser] Error saving door to Redis: ${error.message}`);
+          }
+        }
+      } catch (error) {
+        this.logger.error(`[Parser] Error saving door: ${error.message}`);
+        // Продолжаем с следующей дверью
+        continue;
+      }
+    }
+    
+    return savedCount;
   }
 
   private generateExternalId(door: IDoor): string {
@@ -241,37 +328,32 @@ export class FarnitureService implements OnModuleInit {
 
             savedDoorsCount++;
             this.logger.log(`[Parser] Successfully saved door to DB: ${doorData.title} (${externalId})`);
-
-            // Сохраняем в Redis, только если Redis включен
-            if (this.redisEnabled && this.redisService['client']) {
+            
+            // Сохраняем в Redis, если он включен
+            if (this.redisEnabled) {
               try {
                 const doorHash = this.getDoorHashData(doorData);
-                await this.redisService.set(
-                  `door:${externalId}`,
-                  JSON.stringify(doorHash)
-                );
-                
-                this.logger.log(`[Parser] Successfully saved door to Redis: ${doorData.title} (${externalId})`);
+                const redisKey = `door:${externalId}`;
+                await this.redisService.set(redisKey, JSON.stringify(doorData));
+                this.logger.debug(`[Parser] Saved door to Redis: ${redisKey}`);
               } catch (error) {
                 this.logger.error(`[Parser] Error saving door to Redis: ${error.message}`);
               }
             }
+            
+            allDoors.push(doorData);
           } catch (error) {
-            this.logger.error(`[Parser] Error saving door ${doorData.title}: ${error.message}`);
-            this.logger.error(error.stack);
+            this.logger.error(`[Parser] Error saving door: ${error.message}`);
             continue;
           }
         }
-        
-        allDoors.push(...doors);
-        this.logger.log(`[Parser] Successfully processed ${doors.length} doors from category ${category}`);
       } catch (error) {
         this.logger.error(`[Parser] Error parsing category ${category}: ${error.message}`);
-        this.logger.error(error.stack);
+        continue;
       }
     }
-
-    this.logger.log(`[Parser] Total doors parsed: ${allDoors.length}, Successfully saved to DB: ${savedDoorsCount}`);
+    
+    this.logger.log(`[Parser] Total doors parsed: ${allDoors.length}, saved: ${savedDoorsCount}`);
     return allDoors;
   }
 
@@ -308,13 +390,18 @@ export class FarnitureService implements OnModuleInit {
         }
       });
 
-      this.logger.log(`Found ${subcategoryLinks.size} subcategories in ${category}`);
+      // Ограничиваем количество подкатегорий для парсинга
+      const uniqueSubcategoryLinks = Array.from(subcategoryLinks)
+        .filter(link => !link.includes('?')) // Исключаем ссылки с параметрами (сортировка, пагинация)
+        .slice(0, 5); // Берем только первые 5 уникальных подкатегорий
+      
+      this.logger.log(`Filtered from ${subcategoryLinks.size} to ${uniqueSubcategoryLinks.length} unique subcategories in ${category}`);
 
       // Парсим двери на текущей странице
       await this.parseDoors($, category, doors);
 
       // Парсим каждую подкатегорию
-      for (const subcategoryUrl of subcategoryLinks) {
+      for (const subcategoryUrl of uniqueSubcategoryLinks) {
         try {
           this.logger.log(`Parsing subcategory: ${subcategoryUrl}`);
           const subcategoryResponse = await axios.get(`https://www.farniture.ru${subcategoryUrl}`, {
@@ -344,6 +431,34 @@ export class FarnitureService implements OnModuleInit {
     let doorCards = $('.catalog_item_wrapp.catalog_item.item_wrap');
     
     this.logger.log(`Found ${doorCards.length} doors in category/subcategory`);
+    
+    // Если не нашли двери по основному селектору, попробуем альтернативные
+    if (doorCards.length === 0) {
+      this.logger.warn(`No doors found with primary selector, trying alternatives...`);
+      
+      // Логируем часть HTML для анализа
+      this.logger.debug(`HTML preview: ${$.html().substring(0, 2000)}`);
+      
+      // Пробуем альтернативные селекторы
+      const alternativeSelectors = [
+        '.catalog_block .catalog_item',
+        '.product-item-container',
+        '.js-product-item',
+        '.item.product-item'
+      ];
+      
+      for (const selector of alternativeSelectors) {
+        const altCards = $(selector);
+        this.logger.debug(`Selector "${selector}" found ${altCards.length} elements`);
+        
+        if (altCards.length > 0) {
+          // Используем тип any для обхода проблемы с типами
+          doorCards = altCards as any;
+          this.logger.log(`Using alternative selector "${selector}", found ${doorCards.length} doors`);
+          break;
+        }
+      }
+    }
 
     for (const card of doorCards) {
       try {
