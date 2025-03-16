@@ -136,9 +136,16 @@ export class DoorsService {
   }
 
   private async invalidateCache(): Promise<void> {
-    const keys = await this.redisService['client'].keys('doors:list:*');
-    if (keys.length > 0) {
-      await this.redisService['client'].del(...keys);
+    try {
+      // Используем публичный метод keys вместо прямого доступа к client
+      const keys = await this.redisService.keys('doors:list:*');
+      if (keys.length > 0) {
+        // Используем публичный метод del вместо прямого доступа к client
+        await this.redisService.del(keys);
+      }
+    } catch (error) {
+      this.logger.error(`Error invalidating cache: ${error.message}`);
+      // Продолжаем выполнение, даже если очистка кэша не удалась
     }
   }
 
