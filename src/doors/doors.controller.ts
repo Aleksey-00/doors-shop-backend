@@ -57,18 +57,32 @@ export class DoorsController {
   @Post('update-prices')
   @UseGuards(JwtAuthGuard)
   async updatePrices(
-    @Body() updateData: { category?: string; increasePercent: number }
+    @Body() updateData: { category?: string; increasePercent: number } | string
   ) {
     try {
-      if (!updateData) {
+      let parsedData: { category?: string; increasePercent: number };
+      
+      // Если данные пришли в виде строки, пробуем их распарсить
+      if (typeof updateData === 'string') {
+        try {
+          parsedData = JSON.parse(updateData);
+        } catch (parseError) {
+          console.error('Error parsing updateData string:', parseError);
+          return { success: false, message: 'Неверный формат данных' };
+        }
+      } else {
+        parsedData = updateData;
+      }
+      
+      if (!parsedData) {
         return { success: false, message: 'Не указаны данные для обновления цен' };
       }
       
-      if (updateData.increasePercent === undefined) {
+      if (parsedData.increasePercent === undefined) {
         return { success: false, message: 'Не указан процент увеличения цен' };
       }
       
-      return this.doorsService.updatePrices(updateData.category, updateData.increasePercent);
+      return this.doorsService.updatePrices(parsedData.category, parsedData.increasePercent);
     } catch (error) {
       console.error('Error in updatePrices:', error);
       return { success: false, message: `Ошибка при обновлении цен: ${error.message}` };
@@ -84,12 +98,39 @@ export class DoorsController {
   @Post('update-titles')
   @UseGuards(JwtAuthGuard)
   async updateTitles(
-    @Body() updateData: { category: string; searchText: string; replaceText: string },
+    @Body() updateData: { category: string; searchText: string; replaceText: string } | string,
   ) {
-    return this.doorsService.updateTitlesInCategory(
-      updateData.category,
-      updateData.searchText,
-      updateData.replaceText,
-    );
+    try {
+      let parsedData: { category: string; searchText: string; replaceText: string };
+      
+      // Если данные пришли в виде строки, пробуем их распарсить
+      if (typeof updateData === 'string') {
+        try {
+          parsedData = JSON.parse(updateData);
+        } catch (parseError) {
+          console.error('Error parsing updateData string:', parseError);
+          return { success: false, message: 'Неверный формат данных' };
+        }
+      } else {
+        parsedData = updateData;
+      }
+      
+      if (!parsedData) {
+        return { success: false, message: 'Не указаны данные для обновления заголовков' };
+      }
+      
+      if (!parsedData.category || !parsedData.searchText || !parsedData.replaceText) {
+        return { success: false, message: 'Не указаны все необходимые параметры (категория, искомый текст, заменяемый текст)' };
+      }
+      
+      return this.doorsService.updateTitlesInCategory(
+        parsedData.category,
+        parsedData.searchText,
+        parsedData.replaceText,
+      );
+    } catch (error) {
+      console.error('Error in updateTitles:', error);
+      return { success: false, message: `Ошибка при обновлении заголовков: ${error.message}` };
+    }
   }
 } 
