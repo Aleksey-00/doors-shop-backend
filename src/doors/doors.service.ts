@@ -156,7 +156,11 @@ export class DoorsService {
 
     const updates = doors.map(async (door) => {
       if (door.title.includes(searchText)) {
-        door.title = door.title.replace(searchText, replaceText);
+        // Генерируем UUID и берем первые 7 символов
+        const uuid = require('crypto').randomUUID().substring(0, 7);
+        // Добавляем UUID к замененному тексту
+        const newTitle = door.title.replace(searchText, `${replaceText} ${uuid}`);
+        door.title = newTitle;
         await this.doorRepository.save(door);
         
         // Обновляем кэш в Redis
