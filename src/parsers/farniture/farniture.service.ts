@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Door } from './entities/door.entity';
 import { IDoor } from './interfaces/door.interface';
 import { RedisService } from '../../redis/redis.service';
+import { CreateDoorDto, UpdateDoorDto } from './dto';
 
 @Injectable()
 export class FarnitureService implements OnModuleInit {
@@ -756,5 +757,110 @@ export class FarnitureService implements OnModuleInit {
   // Вспомогательный метод для создания задержки
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Обновление кеша Redis
+  private async updateRedisCache(door: Door) {
+    try {
+      // Обновляем кеш конкретной двери
+      await this.redisService.set(`door:${door.id}`, JSON.stringify(door));
+      
+      // Инвалидируем кеш всех дверей, чтобы он обновился при следующем запросе
+      await this.redisService.del('doors:all');
+      
+      // Инвалидируем все кеши с фильтрами
+      const filterKeys = await this.redisService.keys('doors:query:*');
+      if (filterKeys.length > 0) {
+        await this.redisService.del(filterKeys);
+      }
+      
+      console.log(`✅ Redis cache updated for door ${door.id}`);
+    } catch (error) {
+      console.error('❌ Redis cache update error:', error);
+    }
+  }
+
+  // Создание двери
+  async createDoor(createDoorDto: CreateDoorDto): Promise<Door> {
+    const door = await this.doorRepository.save(createDoorDto);
+    await this.updateRedisCache(door);
+    return door;
+  }
+
+  // Обновление двери
+  async updateDoor(id: string, updateDoorDto: UpdateDoorDto): Promise<Door> {
+    await this.doorRepository.update(id, updateDoorDto);
+    const updatedDoor = await this.doorRepository.findOne({ where: { id } });
+    if (!updatedDoor) {
+      throw new Error(`Door with id ${id} not found`);
+    }
+    await this.updateRedisCache(updatedDoor);
+    return updatedDoor;
+  }
+
+  // Удаление двери
+  async deleteDoor(id: string): Promise<void> {
+    await this.doorRepository.delete(id);
+    try {
+      // Удаляем кеш конкретной двери
+      await this.redisService.del(`door:${id}`);
+      // Инвалидируем общие кеши
+      await this.redisService.del('doors:all');
+      const filterKeys = await this.redisService.keys('doors:query:*');
+      if (filterKeys.length > 0) {
+        await this.redisService.del(filterKeys);
+      }
+      console.log(`✅ Redis cache cleared for deleted door ${id}`);
+    } catch (error) {
+      console.error('❌ Redis cache deletion error:', error);
+    }
+  }
+
+  // Получение дверей с использованием кеша
+  async getDoors(query: any): Promise<Door[]> {
+    // Если запрашиваем все двери без фильтров
+    if (Object.keys(query).length === 0) {
+      const cachedDoors = await this.redisService.get('doors:all');
+      if (cachedDoors) {
+        console.log('✅ Using cached all doors from Redis');
+        return JSON.parse(cachedDoors);
+      }
+      
+      // Если кеша нет - получаем из БД и кешируем
+      const doors = await this.doorRepository.find();
+      await this.redisService.set('doors:all', JSON.stringify(doors));
+      return doors;
+    }
+
+    // Для запросов с фильтрами
+    const cacheKey = `doors:query:${JSON.stringify(query)}`;
+    const cachedData = await this.redisService.get(cacheKey);
+    
+    if (cachedData) {
+      console.log('✅ Using cached filtered doors from Redis');
+      return JSON.parse(cachedData);
+    }
+
+    const doors = await this.doorRepository.find(query);
+    await this.redisService.set(cacheKey, JSON.stringify(doors), 3600);
+    return doors;
+  }
+
+  // Получение одной двери по ID
+  async getDoorById(id: string): Promise<Door> {
+    const cacheKey = `door:${id}`;
+    const cachedDoor = await this.redisService.get(cacheKey);
+    
+    if (cachedDoor) {
+      console.log(`✅ Using cached door ${id} from Redis`);
+      return JSON.parse(cachedDoor);
+    }
+
+    const door = await this.doorRepository.findOne({ where: { id } });
+    if (!door) {
+      throw new Error(`Door with id ${id} not found`);
+    }
+    await this.redisService.set(cacheKey, JSON.stringify(door));
+    return door;
   }
 }
