@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -48,6 +50,21 @@ async function bootstrap() {
     ],
     exposedHeaders: ['Content-Disposition', 'X-RateLimit-Reset'],
     maxAge: 3600,
+  });
+  
+  // Добавляем обработчик для text/plain
+  app.use(bodyParser.text({ type: 'text/plain' }));
+  
+  // Добавляем middleware для преобразования текстовых данных в JSON
+  app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'string' && req.headers['content-type']?.includes('text/plain')) {
+      try {
+        req.body = JSON.parse(req.body);
+      } catch (e) {
+        console.error('Error parsing text/plain body:', e);
+      }
+    }
+    next();
   });
   
   app.setGlobalPrefix('api');
