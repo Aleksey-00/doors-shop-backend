@@ -160,23 +160,23 @@ export class FarnitureService implements OnModuleInit {
 
       this.logger.log('[Parser] Starting doors parsing...');
       
-      // Ограничиваем количество категорий для парсинга
-      const limitedCategories = this.categories.slice(0, 3); // Берем только первые 3 категории
-      this.logger.log(`[Parser] Limited to ${limitedCategories.length} categories: ${limitedCategories.join(', ')}`);
+      // Используем все категории вместо ограничения
+      const categoriesToParse = this.categories;
+      this.logger.log(`[Parser] Will parse all ${categoriesToParse.length} categories: ${categoriesToParse.join(', ')}`);
       
       // Добавляем обработку каждой категории отдельно с повторными попытками
       let totalParsedDoors = 0;
       let totalSavedDoors = 0;
       
       // Обрабатываем категории последовательно
-      for (const category of limitedCategories) {
+      for (const category of categoriesToParse) {
         try {
           this.logger.log(`[Parser] Starting to parse category: ${category}`);
           
           // Добавляем задержку между категориями
           if (totalParsedDoors > 0) {
-            this.logger.log(`[Parser] Waiting 5 seconds before parsing next category...`);
-            await this.delay(5000);
+            this.logger.log(`[Parser] Waiting 10 seconds before parsing next category...`);
+            await this.delay(10000);
           }
           
           const doors = await this.parseCategory(category);
@@ -190,12 +190,6 @@ export class FarnitureService implements OnModuleInit {
             
             // Проверяем промежуточные результаты
             this.logger.log(`[Parser] Progress: parsed ${totalParsedDoors} doors, saved ${totalSavedDoors} doors`);
-            
-            // Если уже собрали достаточно дверей, останавливаем парсинг
-            if (totalSavedDoors >= 100) {
-              this.logger.log(`[Parser] Reached limit of 100 saved doors, stopping parsing`);
-              break;
-            }
           }
         } catch (error) {
           this.logger.error(`[Parser] Error parsing category ${category}: ${error.message}`);
@@ -237,8 +231,8 @@ export class FarnitureService implements OnModuleInit {
   private async saveDoors(doors: IDoor[]): Promise<number> {
     let savedCount = 0;
     
-    // Разбиваем двери на пакеты по 5 штук для снижения нагрузки на БД
-    const batchSize = 5;
+    // Разбиваем двери на пакеты для снижения нагрузки на БД
+    const batchSize = 10; // Увеличиваем размер пакета с 5 до 10
     const batches: IDoor[][] = [];
     
     for (let i = 0; i < doors.length; i += batchSize) {
@@ -254,7 +248,7 @@ export class FarnitureService implements OnModuleInit {
       
       // Добавляем задержку между пакетами
       if (batchIndex > 0) {
-        await this.delay(1000);
+        await this.delay(2000);
       }
       
       // Обрабатываем каждую дверь в пакете
@@ -411,7 +405,7 @@ export class FarnitureService implements OnModuleInit {
       this.logger.log(`Starting to parse category: ${category}`);
       
       // Добавляем задержку перед запросом, чтобы не перегружать сервер
-      await this.delay(1000);
+      await this.delay(2000);
       
       const response = await axios.get(url, {
         headers: {
@@ -423,7 +417,7 @@ export class FarnitureService implements OnModuleInit {
           'Cache-Control': 'max-age=0'
         },
         // Добавляем таймаут для запроса
-        timeout: 10000
+        timeout: 15000
       });
 
       const $ = cheerio.load(response.data);
@@ -442,21 +436,14 @@ export class FarnitureService implements OnModuleInit {
         }
       });
 
-      // Ограничиваем количество подкатегорий для парсинга
+      // Используем все подкатегории вместо ограничения
       const uniqueSubcategoryLinks = Array.from(subcategoryLinks)
-        .filter(link => !link.includes('?')) // Исключаем ссылки с параметрами (сортировка, пагинация)
-        .slice(0, 3); // Берем только первые 3 уникальных подкатегории (уменьшаем с 5 до 3)
+        .filter(link => !link.includes('?')); // Исключаем ссылки с параметрами (сортировка, пагинация)
       
-      this.logger.log(`Filtered from ${subcategoryLinks.size} to ${uniqueSubcategoryLinks.length} unique subcategories in ${category}`);
+      this.logger.log(`Found ${uniqueSubcategoryLinks.length} unique subcategories in ${category}`);
 
       // Парсим двери на текущей странице
       await this.parseDoors($, category, doors);
-
-      // Ограничиваем количество дверей для одной категории
-      if (doors.length >= 50) {
-        this.logger.log(`Reached limit of 50 doors for category ${category}, skipping subcategories`);
-        return doors.slice(0, 50); // Возвращаем только первые 50 дверей
-      }
 
       // Парсим каждую подкатегорию последовательно
       for (const subcategoryUrl of uniqueSubcategoryLinks) {
@@ -464,7 +451,7 @@ export class FarnitureService implements OnModuleInit {
           this.logger.log(`Parsing subcategory: ${subcategoryUrl}`);
           
           // Добавляем задержку между запросами
-          await this.delay(1500);
+          await this.delay(3000);
           
           const subcategoryResponse = await axios.get(`https://www.farniture.ru${subcategoryUrl}`, {
             headers: {
@@ -472,17 +459,11 @@ export class FarnitureService implements OnModuleInit {
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
               'Accept-Language': 'en-US,en;q=0.5',
             },
-            timeout: 10000
+            timeout: 15000
           });
 
           const $subcategory = cheerio.load(subcategoryResponse.data);
           await this.parseDoors($subcategory, category, doors);
-          
-          // Проверяем количество дверей после каждой подкатегории
-          if (doors.length >= 50) {
-            this.logger.log(`Reached limit of 50 doors for category ${category}, stopping parsing`);
-            return doors.slice(0, 50); // Возвращаем только первые 50 дверей
-          }
         } catch (error) {
           this.logger.error(`Error parsing subcategory ${subcategoryUrl}: ${error.message}`);
         }
@@ -529,126 +510,129 @@ export class FarnitureService implements OnModuleInit {
       }
     }
 
-    // Ограничиваем количество карточек для обработки
-    const maxCards = Math.min(doorCards.length, 10); // Обрабатываем не более 10 карточек за раз
-    this.logger.log(`Processing ${maxCards} out of ${doorCards.length} door cards`);
+    // Обрабатываем все карточки, но с ограничением на количество за один раз
+    const batchSize = 15; // Увеличиваем размер пакета с 10 до 15
+    const doorCardsArray = doorCards.toArray();
     
-    // Преобразуем коллекцию в массив и берем только первые maxCards элементов
-    const doorCardsArray = doorCards.toArray().slice(0, maxCards);
-
-    for (const card of doorCardsArray) {
-      try {
-        const $card = $(card);
-        
-        // Получаем основные данные о двери
-        const title = $card.find('.item-title a span').text().trim();
-        const priceText = $card.find('.price.font-bold.font_mxs').attr('data-value') || '';
-        const oldPriceText = $card.find('.price.discount').attr('data-value') || '';
-        
-        // Получаем все изображения из галереи
-        const imageUrls: string[] = [];
-        $card.find('.section-gallery-wrapper__item img.img-responsive').each((_, img) => {
-          // Пробуем получить URL из data-src сначала, так как там обычно хранится реальный URL изображения
-          const imgUrl = $(img).attr('data-src') || $(img).attr('src');
+    // Обрабатываем карточки пакетами
+    for (let i = 0; i < doorCardsArray.length; i += batchSize) {
+      const batch = doorCardsArray.slice(i, i + batchSize);
+      this.logger.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(doorCardsArray.length/batchSize)} (${batch.length} door cards)`);
+      
+      // Добавляем задержку между пакетами
+      if (i > 0) {
+        await this.delay(3000);
+      }
+      
+      for (const card of batch) {
+        try {
+          const $card = $(card);
           
-          // Проверяем, что URL не содержит double_ring.svg и не пустой
-          if (imgUrl && !imgUrl.includes('double_ring.svg')) {
-            const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
-            // Проверяем, что такого URL еще нет в массиве
-            if (!imageUrls.includes(fullUrl)) {
-              imageUrls.push(fullUrl);
-            }
-          }
-        });
-
-        // Если изображения не найдены в галерее, попробуем поискать в других местах
-        if (imageUrls.length === 0) {
-          const mainImage = $card.find('.image_wrapper_block img.img-responsive');
-          mainImage.each((_, img) => {
+          // Получаем основные данные о двери
+          const title = $card.find('.item-title a span').text().trim();
+          const priceText = $card.find('.price.font-bold.font_mxs').attr('data-value') || '';
+          const oldPriceText = $card.find('.price.discount').attr('data-value') || '';
+          
+          // Получаем все изображения из галереи
+          const imageUrls: string[] = [];
+          $card.find('.section-gallery-wrapper__item img.img-responsive').each((_, img) => {
+            // Пробуем получить URL из data-src сначала, так как там обычно хранится реальный URL изображения
             const imgUrl = $(img).attr('data-src') || $(img).attr('src');
+            
+            // Проверяем, что URL не содержит double_ring.svg и не пустой
             if (imgUrl && !imgUrl.includes('double_ring.svg')) {
               const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
+              // Проверяем, что такого URL еще нет в массиве
               if (!imageUrls.includes(fullUrl)) {
                 imageUrls.push(fullUrl);
               }
             }
           });
-        }
 
-        this.logger.debug(`Found ${imageUrls.length} images for door: ${title}`);
-        this.logger.debug(`Image URLs: ${JSON.stringify(imageUrls, null, 2)}`);
-
-        // Пропускаем дверь, если не нашли ни одного изображения
-        if (imageUrls.length === 0) {
-          this.logger.warn(`Skipping door "${title}" - no valid images found`);
-          continue;
-        }
-
-        const productUrl = $card.find('.item-title a').attr('href');
-        const stockBlock = $card.find('.item-stock');
-        const inStock = stockBlock.length > 0 && stockBlock.find('.value').text().includes('Есть в наличии');
-
-        if (!title || !priceText) {
-          this.logger.warn(`Skipping door due to missing required data (title: ${!!title}, price: ${!!priceText})`);
-          continue;
-        }
-
-        const door: IDoor = {
-          title,
-          price: parseInt(priceText) || 0,
-          oldPrice: oldPriceText ? parseInt(oldPriceText) : undefined,
-          category,
-          imageUrls,
-          inStock,
-          url: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`) : '',
-        };
-
-        // Ограничиваем парсинг деталей продукта
-        // Вместо запроса деталей для каждой двери, делаем это только для каждой третьей
-        if (productUrl && doors.length % 3 === 0) {
-          try {
-            // Добавляем задержку перед запросом деталей
-            await this.delay(1000);
-            
-            const details = await this.parseProductDetails(door.url);
-            Object.assign(door, details);
-          } catch (error) {
-            this.logger.warn(`Error parsing details for ${title}: ${error.message}`);
+          // Если изображения не найдены в галерее, попробуем поискать в других местах
+          if (imageUrls.length === 0) {
+            const mainImage = $card.find('.image_wrapper_block img.img-responsive');
+            mainImage.each((_, img) => {
+              const imgUrl = $(img).attr('data-src') || $(img).attr('src');
+              if (imgUrl && !imgUrl.includes('double_ring.svg')) {
+                const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
+                if (!imageUrls.includes(fullUrl)) {
+                  imageUrls.push(fullUrl);
+                }
+              }
+            });
           }
-        }
 
-        doors.push(door);
-        this.logger.debug(`Successfully parsed door: ${title}`);
-      } catch (error) {
-        this.logger.error(`Error parsing door card: ${error.message}`);
-        continue;
+          this.logger.debug(`Found ${imageUrls.length} images for door: ${title}`);
+          this.logger.debug(`Image URLs: ${JSON.stringify(imageUrls, null, 2)}`);
+
+          // Пропускаем дверь, если не нашли ни одного изображения
+          if (imageUrls.length === 0) {
+            this.logger.warn(`Skipping door "${title}" - no valid images found`);
+            continue;
+          }
+
+          const productUrl = $card.find('.item-title a').attr('href');
+          const stockBlock = $card.find('.item-stock');
+          const inStock = stockBlock.length > 0 && stockBlock.find('.value').text().includes('Есть в наличии');
+
+          if (!title || !priceText) {
+            this.logger.warn(`Skipping door due to missing required data (title: ${!!title}, price: ${!!priceText})`);
+            continue;
+          }
+
+          const door: IDoor = {
+            title,
+            price: parseInt(priceText) || 0,
+            oldPrice: oldPriceText ? parseInt(oldPriceText) : undefined,
+            category,
+            imageUrls,
+            inStock,
+            url: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`) : '',
+          };
+
+          // Получаем детали продукта для каждой второй двери вместо каждой третьей
+          if (productUrl && doors.length % 2 === 0) {
+            try {
+              // Добавляем задержку перед запросом деталей
+              await this.delay(2000);
+              
+              const details = await this.parseProductDetails(door.url);
+              Object.assign(door, details);
+            } catch (error) {
+              this.logger.warn(`Error parsing details for ${title}: ${error.message}`);
+            }
+          }
+
+          doors.push(door);
+          this.logger.debug(`Successfully parsed door: ${title}`);
+        } catch (error) {
+          this.logger.error(`Error parsing door card: ${error.message}`);
+          continue;
+        }
       }
     }
 
-    // Ограничиваем пагинацию - не переходим на следующие страницы, если уже собрали достаточно дверей
-    if (doors.length < 50) {
-      const nextPageLink = $('[data-entity="pagination"] .next a').attr('href');
-      if (nextPageLink) {
-        try {
-          this.logger.log(`Found next page: ${nextPageLink}`);
-          
-          // Добавляем задержку перед запросом следующей страницы
-          await this.delay(2000);
-          
-          const nextPageResponse = await axios.get(`https://www.farniture.ru${nextPageLink}`, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            },
-            timeout: 10000
-          });
-          const $nextPage = cheerio.load(nextPageResponse.data);
-          await this.parseDoors($nextPage, category, doors);
-        } catch (error) {
-          this.logger.error(`Error parsing next page ${nextPageLink}: ${error.message}`);
-        }
+    // Обрабатываем пагинацию для всех страниц
+    const nextPageLink = $('[data-entity="pagination"] .next a').attr('href');
+    if (nextPageLink) {
+      try {
+        this.logger.log(`Found next page: ${nextPageLink}`);
+        
+        // Добавляем задержку перед запросом следующей страницы
+        await this.delay(5000);
+        
+        const nextPageResponse = await axios.get(`https://www.farniture.ru${nextPageLink}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          },
+          timeout: 15000
+        });
+        const $nextPage = cheerio.load(nextPageResponse.data);
+        await this.parseDoors($nextPage, category, doors);
+      } catch (error) {
+        this.logger.error(`Error parsing next page ${nextPageLink}: ${error.message}`);
       }
-    } else {
-      this.logger.log(`Skipping pagination as we already have ${doors.length} doors`);
     }
   }
 
