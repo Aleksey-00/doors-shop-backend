@@ -160,13 +160,25 @@ export class FarnitureService implements OnModuleInit {
 
       this.logger.log('[Parser] Starting doors parsing...');
       
+      // Ограничиваем количество категорий для парсинга
+      const limitedCategories = this.categories.slice(0, 3); // Берем только первые 3 категории
+      this.logger.log(`[Parser] Limited to ${limitedCategories.length} categories: ${limitedCategories.join(', ')}`);
+      
       // Добавляем обработку каждой категории отдельно с повторными попытками
       let totalParsedDoors = 0;
       let totalSavedDoors = 0;
       
-      for (const category of this.categories) {
+      // Обрабатываем категории последовательно
+      for (const category of limitedCategories) {
         try {
           this.logger.log(`[Parser] Starting to parse category: ${category}`);
+          
+          // Добавляем задержку между категориями
+          if (totalParsedDoors > 0) {
+            this.logger.log(`[Parser] Waiting 5 seconds before parsing next category...`);
+            await this.delay(5000);
+          }
+          
           const doors = await this.parseCategory(category);
           
           // Сразу сохраняем двери из этой категории
@@ -175,6 +187,15 @@ export class FarnitureService implements OnModuleInit {
             const savedCount = await this.saveDoors(doors);
             totalParsedDoors += doors.length;
             totalSavedDoors += savedCount;
+            
+            // Проверяем промежуточные результаты
+            this.logger.log(`[Parser] Progress: parsed ${totalParsedDoors} doors, saved ${totalSavedDoors} doors`);
+            
+            // Если уже собрали достаточно дверей, останавливаем парсинг
+            if (totalSavedDoors >= 100) {
+              this.logger.log(`[Parser] Reached limit of 100 saved doors, stopping parsing`);
+              break;
+            }
           }
         } catch (error) {
           this.logger.error(`[Parser] Error parsing category ${category}: ${error.message}`);
@@ -216,53 +237,78 @@ export class FarnitureService implements OnModuleInit {
   private async saveDoors(doors: IDoor[]): Promise<number> {
     let savedCount = 0;
     
-    for (const doorData of doors) {
-      try {
-        const externalId = this.generateExternalId(doorData);
-        
-        // Проверяем обязательные поля
-        if (!doorData.title || !doorData.price || !doorData.category || !doorData.url) {
-          this.logger.error(`[Parser] Missing required fields for door: ${JSON.stringify(doorData)}`);
-          continue;
-        }
-
-        // Подготавливаем данные для сохранения
-        const doorToSave = {
-          ...doorData,
-          externalId,
-          imageUrls: doorData.imageUrls || [],
-          inStock: doorData.inStock || false,
-          description: doorData.description || '',
-          specifications: doorData.specifications || {},
-        };
-
-        // Сохраняем в базу данных
-        const savedDoor = await this.doorRepository.save(doorToSave);
-        
-        if (!savedDoor || !savedDoor.id) {
-          this.logger.error(`[Parser] Failed to save door ${doorData.title} to database`);
-          continue;
-        }
-
-        savedCount++;
-        this.logger.log(`[Parser] Successfully saved door to DB: ${doorData.title} (${externalId})`);
-        
-        // Сохраняем в Redis, если он включен
-        if (this.redisEnabled) {
-          try {
-            const doorHash = this.getDoorHashData(doorData);
-            const redisKey = `door:${externalId}`;
-            await this.redisService.set(redisKey, JSON.stringify(doorData));
-            this.logger.debug(`[Parser] Saved door to Redis: ${redisKey}`);
-          } catch (error) {
-            this.logger.error(`[Parser] Error saving door to Redis: ${error.message}`);
-          }
-        }
-      } catch (error) {
-        this.logger.error(`[Parser] Error saving door: ${error.message}`);
-        // Продолжаем с следующей дверью
-        continue;
+    // Разбиваем двери на пакеты по 5 штук для снижения нагрузки на БД
+    const batchSize = 5;
+    const batches: IDoor[][] = [];
+    
+    for (let i = 0; i < doors.length; i += batchSize) {
+      batches.push(doors.slice(i, i + batchSize));
+    }
+    
+    this.logger.log(`[Parser] Split ${doors.length} doors into ${batches.length} batches of ${batchSize}`);
+    
+    // Обрабатываем каждый пакет
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      this.logger.log(`[Parser] Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} doors)`);
+      
+      // Добавляем задержку между пакетами
+      if (batchIndex > 0) {
+        await this.delay(1000);
       }
+      
+      // Обрабатываем каждую дверь в пакете
+      for (const doorData of batch) {
+        try {
+          const externalId = this.generateExternalId(doorData);
+          
+          // Проверяем обязательные поля
+          if (!doorData.title || !doorData.price || !doorData.category || !doorData.url) {
+            this.logger.error(`[Parser] Missing required fields for door: ${JSON.stringify(doorData)}`);
+            continue;
+          }
+
+          // Подготавливаем данные для сохранения
+          const doorToSave = {
+            ...doorData,
+            externalId,
+            imageUrls: doorData.imageUrls || [],
+            inStock: doorData.inStock || false,
+            description: doorData.description || '',
+            specifications: doorData.specifications || {},
+          };
+
+          // Сохраняем в базу данных
+          const savedDoor = await this.doorRepository.save(doorToSave);
+          
+          if (!savedDoor || !savedDoor.id) {
+            this.logger.error(`[Parser] Failed to save door ${doorData.title} to database`);
+            continue;
+          }
+
+          savedCount++;
+          this.logger.log(`[Parser] Successfully saved door to DB: ${doorData.title} (${externalId})`);
+          
+          // Сохраняем в Redis, если он включен
+          if (this.redisEnabled) {
+            try {
+              const doorHash = this.getDoorHashData(doorData);
+              const redisKey = `door:${externalId}`;
+              await this.redisService.set(redisKey, JSON.stringify(doorData));
+              this.logger.debug(`[Parser] Saved door to Redis: ${redisKey}`);
+            } catch (error) {
+              this.logger.error(`[Parser] Error saving door to Redis: ${error.message}`);
+            }
+          }
+        } catch (error) {
+          this.logger.error(`[Parser] Error saving door: ${error.message}`);
+          // Продолжаем с следующей дверью
+          continue;
+        }
+      }
+      
+      // Логируем прогресс после каждого пакета
+      this.logger.log(`[Parser] Batch ${batchIndex + 1}/${batches.length} completed. Total saved: ${savedCount}/${doors.length}`);
     }
     
     return savedCount;
@@ -363,6 +409,10 @@ export class FarnitureService implements OnModuleInit {
 
     try {
       this.logger.log(`Starting to parse category: ${category}`);
+      
+      // Добавляем задержку перед запросом, чтобы не перегружать сервер
+      await this.delay(1000);
+      
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -371,7 +421,9 @@ export class FarnitureService implements OnModuleInit {
           'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
           'Cache-Control': 'max-age=0'
-        }
+        },
+        // Добавляем таймаут для запроса
+        timeout: 10000
       });
 
       const $ = cheerio.load(response.data);
@@ -393,27 +445,44 @@ export class FarnitureService implements OnModuleInit {
       // Ограничиваем количество подкатегорий для парсинга
       const uniqueSubcategoryLinks = Array.from(subcategoryLinks)
         .filter(link => !link.includes('?')) // Исключаем ссылки с параметрами (сортировка, пагинация)
-        .slice(0, 5); // Берем только первые 5 уникальных подкатегорий
+        .slice(0, 3); // Берем только первые 3 уникальных подкатегории (уменьшаем с 5 до 3)
       
       this.logger.log(`Filtered from ${subcategoryLinks.size} to ${uniqueSubcategoryLinks.length} unique subcategories in ${category}`);
 
       // Парсим двери на текущей странице
       await this.parseDoors($, category, doors);
 
-      // Парсим каждую подкатегорию
+      // Ограничиваем количество дверей для одной категории
+      if (doors.length >= 50) {
+        this.logger.log(`Reached limit of 50 doors for category ${category}, skipping subcategories`);
+        return doors.slice(0, 50); // Возвращаем только первые 50 дверей
+      }
+
+      // Парсим каждую подкатегорию последовательно
       for (const subcategoryUrl of uniqueSubcategoryLinks) {
         try {
           this.logger.log(`Parsing subcategory: ${subcategoryUrl}`);
+          
+          // Добавляем задержку между запросами
+          await this.delay(1500);
+          
           const subcategoryResponse = await axios.get(`https://www.farniture.ru${subcategoryUrl}`, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
               'Accept-Language': 'en-US,en;q=0.5',
-            }
+            },
+            timeout: 10000
           });
 
           const $subcategory = cheerio.load(subcategoryResponse.data);
           await this.parseDoors($subcategory, category, doors);
+          
+          // Проверяем количество дверей после каждой подкатегории
+          if (doors.length >= 50) {
+            this.logger.log(`Reached limit of 50 doors for category ${category}, stopping parsing`);
+            return doors.slice(0, 50); // Возвращаем только первые 50 дверей
+          }
         } catch (error) {
           this.logger.error(`Error parsing subcategory ${subcategoryUrl}: ${error.message}`);
         }
@@ -460,7 +529,14 @@ export class FarnitureService implements OnModuleInit {
       }
     }
 
-    for (const card of doorCards) {
+    // Ограничиваем количество карточек для обработки
+    const maxCards = Math.min(doorCards.length, 10); // Обрабатываем не более 10 карточек за раз
+    this.logger.log(`Processing ${maxCards} out of ${doorCards.length} door cards`);
+    
+    // Преобразуем коллекцию в массив и берем только первые maxCards элементов
+    const doorCardsArray = doorCards.toArray().slice(0, maxCards);
+
+    for (const card of doorCardsArray) {
       try {
         const $card = $(card);
         
@@ -527,8 +603,13 @@ export class FarnitureService implements OnModuleInit {
           url: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`) : '',
         };
 
-        if (productUrl) {
+        // Ограничиваем парсинг деталей продукта
+        // Вместо запроса деталей для каждой двери, делаем это только для каждой третьей
+        if (productUrl && doors.length % 3 === 0) {
           try {
+            // Добавляем задержку перед запросом деталей
+            await this.delay(1000);
+            
             const details = await this.parseProductDetails(door.url);
             Object.assign(door, details);
           } catch (error) {
@@ -544,21 +625,30 @@ export class FarnitureService implements OnModuleInit {
       }
     }
 
-    // Проверяем наличие пагинации
-    const nextPageLink = $('[data-entity="pagination"] .next a').attr('href');
-    if (nextPageLink) {
-      try {
-        this.logger.log(`Found next page: ${nextPageLink}`);
-        const nextPageResponse = await axios.get(`https://www.farniture.ru${nextPageLink}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        });
-        const $nextPage = cheerio.load(nextPageResponse.data);
-        await this.parseDoors($nextPage, category, doors);
-      } catch (error) {
-        this.logger.error(`Error parsing next page ${nextPageLink}: ${error.message}`);
+    // Ограничиваем пагинацию - не переходим на следующие страницы, если уже собрали достаточно дверей
+    if (doors.length < 50) {
+      const nextPageLink = $('[data-entity="pagination"] .next a').attr('href');
+      if (nextPageLink) {
+        try {
+          this.logger.log(`Found next page: ${nextPageLink}`);
+          
+          // Добавляем задержку перед запросом следующей страницы
+          await this.delay(2000);
+          
+          const nextPageResponse = await axios.get(`https://www.farniture.ru${nextPageLink}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            timeout: 10000
+          });
+          const $nextPage = cheerio.load(nextPageResponse.data);
+          await this.parseDoors($nextPage, category, doors);
+        } catch (error) {
+          this.logger.error(`Error parsing next page ${nextPageLink}: ${error.message}`);
+        }
       }
+    } else {
+      this.logger.log(`Skipping pagination as we already have ${doors.length} doors`);
     }
   }
 
@@ -568,7 +658,8 @@ export class FarnitureService implements OnModuleInit {
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        },
+        timeout: 10000
       });
       
       const $ = cheerio.load(response.data);
@@ -676,5 +767,10 @@ export class FarnitureService implements OnModuleInit {
       this.logger.error(error.stack);
       throw error;
     }
+  }
+
+  // Вспомогательный метод для создания задержки
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
