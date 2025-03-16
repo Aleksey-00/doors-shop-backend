@@ -25,7 +25,8 @@
     "create-admin": "ts-node src/scripts/create-admin.ts",
     "test:db": "ts-node src/db-test.ts",
     "test:env": "ts-node src/env-test.ts",
-    "sync:redis": "ts-node src/scripts/sync-redis.ts"
+    "sync:redis": "ts-node src/scripts/sync-redis.ts",
+    "seed": "ts-node src/scripts/run-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

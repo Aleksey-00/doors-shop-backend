@@ -44,8 +44,16 @@ ENV RAILWAY_ENVIRONMENT=true
 ENV REDIS_ENABLED=true
 ENV REDIS_URL=redis://default:mtUQxXvFcfAWLxbmhGiSomzsNvPCpiBl@centerbeam.proxy.rlwy.net:34577
 
-# Создаем скрипт для запуска приложения с миграциями и синхронизацией Redis
-RUN printf '#!/bin/sh\necho "Running migrations..."\nnpm run migration:run\necho "Synchronizing Redis..."\nnpm run sync:redis\necho "Starting application..."\nnode dist/src/main.js\n' > /app/start.sh
+# Создаем скрипт для запуска приложения с миграциями, заполнением данных и синхронизацией Redis
+RUN printf '#!/bin/sh\n\
+echo "Running migrations..."\n\
+npm run migration:run\n\
+echo "Seeding database..."\n\
+npm run seed\n\
+echo "Synchronizing Redis..."\n\
+npm run sync:redis\n\
+echo "Starting application..."\n\
+node dist/src/main.js\n' > /app/start.sh
 
 # Делаем скрипт исполняемым
 RUN chmod +x /app/start.sh
