@@ -7,6 +7,7 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() credentials: { email: string; password: string }) {
+    // Пароль уже хеширован на фронтенде с помощью SHA256
     const user = await this.authService.validateUser(credentials.email, credentials.password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
