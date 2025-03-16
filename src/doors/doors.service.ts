@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Door } from '../parsers/farniture/entities/door.entity';
 import { RedisService } from '../redis/redis.service';
+import { In } from 'typeorm';
 
 interface FindAllFilters {
   category?: string;
@@ -240,17 +241,37 @@ export class DoorsService {
         queryBuilder.where('door.category = :category', { category });
       }
 
-      const doors = await queryBuilder.getMany();
-      this.logger.log(`Found ${doors.length} doors for price update, increase by ${increasePercent}%`);
+      // Получаем только ID дверей для пакетной обработки
+      const doorIds = await queryBuilder.select('door.id').getRawMany();
+      this.logger.log(`Found ${doorIds.length} doors for price update, increase by ${increasePercent}%`);
 
-      for (const door of doors) {
-        door.price = Math.round(door.price * (1 + increasePercent / 100));
-        if (door.oldPrice) {
-          door.oldPrice = Math.round(door.oldPrice * (1 + increasePercent / 100));
+      // Размер пакета
+      const batchSize = 100;
+      let updatedCount = 0;
+
+      // Обрабатываем двери пакетами
+      for (let i = 0; i < doorIds.length; i += batchSize) {
+        const batchIds = doorIds.slice(i, i + batchSize).map(item => item.door_id);
+        this.logger.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(doorIds.length / batchSize)}, size: ${batchIds.length}`);
+        
+        // Получаем двери текущего пакета
+        const doors = await this.doorRepository.findBy({
+          id: In(batchIds)
+        });
+        
+        // Обновляем цены
+        for (const door of doors) {
+          door.price = Math.round(door.price * (1 + increasePercent / 100));
+          if (door.oldPrice) {
+            door.oldPrice = Math.round(door.oldPrice * (1 + increasePercent / 100));
+          }
         }
-      }
 
-      await this.doorRepository.save(doors);
+        // Сохраняем пакет
+        await this.doorRepository.save(doors);
+        updatedCount += doors.length;
+        this.logger.log(`Batch ${i / batchSize + 1} completed, updated ${doors.length} doors, total: ${updatedCount}`);
+      }
       
       // Очищаем кэш с обработкой ошибок
       try {
@@ -260,7 +281,7 @@ export class DoorsService {
         // Продолжаем выполнение, даже если очистка кэша не удалась
       }
       
-      this.logger.log(`Successfully updated prices for ${doors.length} doors`);
+      this.logger.log(`Successfully updated prices for ${updatedCount} doors`);
       return { success: true, message: `Цены успешно обновлены${category ? ` в категории "${category}"` : ' во всех категориях'}` };
     } catch (error) {
       this.logger.error(`Error in updatePrices: ${error.message}`);
