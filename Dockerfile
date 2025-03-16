@@ -48,8 +48,10 @@ ENV REDIS_URL=redis://default:mtUQxXvFcfAWLxbmhGiSomzsNvPCpiBl@centerbeam.proxy.
 RUN printf '#!/bin/sh\n\
 echo "Running migrations..."\n\
 npm run migration:run\n\
+echo "Building application..."\n\
+npm run build\n\
 echo "Seeding database..."\n\
-npm run seed\n\
+NODE_ENV=production node dist/scripts/run-seed.js\n\
 echo "Synchronizing Redis..."\n\
 npm run sync:redis\n\
 echo "Starting application..."\n\
