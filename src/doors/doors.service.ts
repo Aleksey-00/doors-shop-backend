@@ -150,61 +150,119 @@ export class DoorsService {
   }
 
   async create(door: Partial<Door>): Promise<Door> {
-    const newDoor = this.doorRepository.create(door);
-    const savedDoor = await this.doorRepository.save(newDoor);
-    await this.invalidateCache();
-    return savedDoor;
+    try {
+      const newDoor = this.doorRepository.create(door);
+      const savedDoor = await this.doorRepository.save(newDoor);
+      
+      // Очищаем кэш с обработкой ошибок
+      try {
+        await this.invalidateCache();
+      } catch (cacheError) {
+        this.logger.error(`Error invalidating cache: ${cacheError.message}`);
+        // Продолжаем выполнение, даже если очистка кэша не удалась
+      }
+      
+      this.logger.log(`Successfully created door with ID ${savedDoor.id}`);
+      return savedDoor;
+    } catch (error) {
+      this.logger.error(`Error in create: ${error.message}`);
+      this.logger.error(error.stack);
+      throw error;
+    }
   }
 
   async updateTitlesInCategory(category: string, searchText: string, replaceText: string): Promise<void> {
-    const doors = await this.doorRepository.find({
-      where: { category },
-    });
+    try {
+      const doors = await this.doorRepository.find({
+        where: { category },
+      });
 
-    const updates = doors.map(async (door) => {
-      if (door.title.includes(searchText)) {
-        // Генерируем UUID и берем первые 7 символов
-        const uuid = require('crypto').randomUUID().substring(0, 7);
-        // Добавляем UUID к замененному тексту
-        const newTitle = door.title.replace(searchText, `${replaceText} ${uuid}`);
-        door.title = newTitle;
-        await this.doorRepository.save(door);
-        
-        // Обновляем кэш в Redis
-        const cachedData = await this.redisService.get(`door:${door.externalId}`);
-        if (cachedData) {
-          const doorData = JSON.parse(cachedData);
-          doorData.title = door.title;
-          await this.redisService.set(
-            `door:${door.externalId}`,
-            JSON.stringify(doorData)
-          );
+      this.logger.log(`Found ${doors.length} doors in category "${category}" for title update`);
+
+      const updates = doors.map(async (door) => {
+        try {
+          if (door.title.includes(searchText)) {
+            // Генерируем UUID и берем первые 7 символов
+            const uuid = require('crypto').randomUUID().substring(0, 7);
+            // Добавляем UUID к замененному тексту
+            const newTitle = door.title.replace(searchText, `${replaceText} ${uuid}`);
+            door.title = newTitle;
+            await this.doorRepository.save(door);
+            
+            // Обновляем кэш в Redis с обработкой ошибок
+            try {
+              const cachedData = await this.redisService.get(`door:${door.externalId}`);
+              if (cachedData) {
+                const doorData = JSON.parse(cachedData);
+                doorData.title = door.title;
+                await this.redisService.set(
+                  `door:${door.externalId}`,
+                  JSON.stringify(doorData)
+                );
+              }
+            } catch (redisError) {
+              this.logger.error(`Error updating Redis cache for door ${door.id}: ${redisError.message}`);
+              // Продолжаем выполнение, даже если обновление кэша не удалось
+            }
+          }
+        } catch (doorError) {
+          this.logger.error(`Error updating door ${door.id}: ${doorError.message}`);
+          // Продолжаем с другими дверями, даже если обновление одной не удалось
         }
-      }
-    });
+      });
 
-    await Promise.all(updates);
-    await this.invalidateCache();
+      await Promise.all(updates);
+      
+      // Очищаем кэш с обработкой ошибок
+      try {
+        await this.invalidateCache();
+      } catch (cacheError) {
+        this.logger.error(`Error invalidating cache: ${cacheError.message}`);
+        // Продолжаем выполнение, даже если очистка кэша не удалась
+      }
+      
+      this.logger.log(`Successfully updated titles in category "${category}"`);
+    } catch (error) {
+      this.logger.error(`Error in updateTitlesInCategory: ${error.message}`);
+      this.logger.error(error.stack);
+      throw error;
+    }
   }
 
   async updatePrices(category: string | undefined, increasePercent: number) {
-    const queryBuilder = this.doorRepository.createQueryBuilder('door');
+    try {
+      const queryBuilder = this.doorRepository.createQueryBuilder('door');
 
-    if (category) {
-      queryBuilder.where('door.category = :category', { category });
-    }
-
-    const doors = await queryBuilder.getMany();
-
-    for (const door of doors) {
-      door.price = Math.round(door.price * (1 + increasePercent / 100));
-      if (door.oldPrice) {
-        door.oldPrice = Math.round(door.oldPrice * (1 + increasePercent / 100));
+      if (category) {
+        queryBuilder.where('door.category = :category', { category });
       }
-    }
 
-    await this.doorRepository.save(doors);
-    await this.invalidateCache();
-    return { message: 'Цены успешно обновлены' };
+      const doors = await queryBuilder.getMany();
+      this.logger.log(`Found ${doors.length} doors for price update, increase by ${increasePercent}%`);
+
+      for (const door of doors) {
+        door.price = Math.round(door.price * (1 + increasePercent / 100));
+        if (door.oldPrice) {
+          door.oldPrice = Math.round(door.oldPrice * (1 + increasePercent / 100));
+        }
+      }
+
+      await this.doorRepository.save(doors);
+      
+      // Очищаем кэш с обработкой ошибок
+      try {
+        await this.invalidateCache();
+      } catch (cacheError) {
+        this.logger.error(`Error invalidating cache: ${cacheError.message}`);
+        // Продолжаем выполнение, даже если очистка кэша не удалась
+      }
+      
+      this.logger.log(`Successfully updated prices for ${doors.length} doors`);
+      return { message: 'Цены успешно обновлены' };
+    } catch (error) {
+      this.logger.error(`Error in updatePrices: ${error.message}`);
+      this.logger.error(error.stack);
+      throw error;
+    }
   }
 } 
