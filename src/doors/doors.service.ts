@@ -117,6 +117,33 @@ export class DoorsService {
     }
   }
 
+  async findOne(id: string): Promise<Door> {
+    this.logger.log(`Finding door with id: ${id}`);
+    
+    // Try to get from cache first
+    const cacheKey = `door:${id}`;
+    const cachedDoor = await this.redisService.get(cacheKey);
+    
+    if (cachedDoor) {
+      this.logger.log(`Found cached door with id: ${id}`);
+      return JSON.parse(cachedDoor);
+    }
+
+    this.logger.log(`No cached door found, querying database for id: ${id}`);
+    const door = await this.doorRepository.findOneBy({ id });
+    
+    if (!door) {
+      this.logger.warn(`Door with id ${id} not found`);
+      throw new Error(`Door with id ${id} not found`);
+    }
+
+    // Cache the result
+    await this.redisService.set(cacheKey, JSON.stringify(door));
+    this.logger.log(`Cached door with id: ${id}`);
+
+    return door;
+  }
+
   private async invalidateCache(): Promise<void> {
     await this.errorHandler.handleCacheOperation(
       async () => {

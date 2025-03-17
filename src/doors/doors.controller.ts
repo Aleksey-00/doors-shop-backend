@@ -53,6 +53,12 @@ export class DoorsController {
     );
   }
 
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    this.logger.log(`Getting door with id: ${id}`);
+    return this.doorsService.findOne(id);
+  }
+
   @Post('update-prices')
   @UseGuards(JwtAuthGuard)
   async updatePrices(
