@@ -4,6 +4,18 @@ export class CreateTables1710000000000 implements MigrationInterface {
     name = 'CreateTables1710000000000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        // Создаем таблицу пользователей
+        await queryRunner.query(`
+            CREATE TABLE IF NOT EXISTS "users" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "email" character varying NOT NULL UNIQUE,
+                "password" character varying NOT NULL,
+                "role" character varying NOT NULL DEFAULT 'user',
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now()
+            )
+        `);
+
         await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "categories" (
                 "id" SERIAL PRIMARY KEY,
@@ -46,5 +58,6 @@ export class CreateTables1710000000000 implements MigrationInterface {
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`DROP TABLE IF EXISTS "doors"`);
         await queryRunner.query(`DROP TABLE IF EXISTS "categories"`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "users"`);
     }
 } 
