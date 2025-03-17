@@ -592,8 +592,8 @@ export class FarnitureService implements OnModuleInit {
             url: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`) : '',
           };
 
-          // Получаем детали продукта для каждой второй двери вместо каждой третьей
-          if (productUrl && doors.length % 2 === 0) {
+          // Получаем детали продукта для каждой двери вместо каждой второй
+          if (productUrl) {
             try {
               // Добавляем задержку перед запросом деталей
               await this.delay(2000);
@@ -654,21 +654,119 @@ export class FarnitureService implements OnModuleInit {
       
       // Получаем характеристики товара
       const specifications: Record<string, string> = {};
+      const dimensions: { width?: number; height?: number; depth?: number } = {};
+      const materials: { frame?: string; coating?: string; insulation?: string } = {};
+      const features: string[] = [];
+      let manufacturer: string | undefined;
+      let warranty: string | undefined;
+      const installation: { opening?: 'left' | 'right' | 'universal'; type?: string } = {};
+      const equipment: string[] = [];
+
+      // Парсим характеристики
       $('.props_list tr').each((_, element) => {
         const $element = $(element);
-        const key = $element.find('.char_name span').text().trim();
+        const key = $element.find('.char_name span').text().trim().toLowerCase();
         const value = $element.find('.char_value span').text().trim();
+
         if (key && value) {
           specifications[key] = value;
+
+          // Парсим размеры
+          if (key.includes('ширина')) {
+            dimensions.width = parseInt(value);
+          } else if (key.includes('высота')) {
+            dimensions.height = parseInt(value);
+          } else if (key.includes('глубина') || key.includes('толщина')) {
+            dimensions.depth = parseInt(value);
+          }
+          
+          // Парсим материалы
+          else if (key.includes('материал') && key.includes('корпус')) {
+            materials.frame = value;
+          } else if (key.includes('покрытие')) {
+            materials.coating = value;
+          } else if (key.includes('утеплитель') || key.includes('наполнитель')) {
+            materials.insulation = value;
+          }
+          
+          // Парсим производителя
+          else if (key.includes('производитель') || key.includes('бренд')) {
+            manufacturer = value;
+          }
+          
+          // Парсим гарантию
+          else if (key.includes('гарантия')) {
+            warranty = value;
+          }
+          
+          // Парсим тип открывания
+          else if (key.includes('открывание')) {
+            if (value.toLowerCase().includes('лев')) {
+              installation.opening = 'left';
+            } else if (value.toLowerCase().includes('прав')) {
+              installation.opening = 'right';
+            } else if (value.toLowerCase().includes('универсал')) {
+              installation.opening = 'universal';
+            }
+          }
+          
+          // Парсим тип установки
+          else if (key.includes('установка') || key.includes('монтаж')) {
+            installation.type = value;
+          }
         }
       });
 
-      this.logger.debug(`Parsed details - Description length: ${description.length}, Specifications count: ${Object.keys(specifications).length}`);
+      // Парсим комплектацию
+      $('.complectation_list li, .equipment_list li').each((_, element) => {
+        const item = $(element).text().trim();
+        if (item) {
+          equipment.push(item);
+        }
+      });
 
-      return {
+      // Парсим особенности и преимущества
+      $('.features_list li, .advantages_list li').each((_, element) => {
+        const feature = $(element).text().trim();
+        if (feature) {
+          features.push(feature);
+        }
+      });
+
+      // Если комплектация не найдена в списках, ищем в характеристиках
+      if (equipment.length === 0) {
+        const complectationSpec = Object.entries(specifications).find(([key]) => 
+          key.toLowerCase().includes('комплектация') || key.toLowerCase().includes('комплект')
+        );
+        if (complectationSpec) {
+          equipment.push(...complectationSpec[1].split(/[,;]/));
+        }
+      }
+
+      this.logger.debug(`Parsed details:
+        - Description length: ${description.length}
+        - Specifications count: ${Object.keys(specifications).length}
+        - Dimensions: ${JSON.stringify(dimensions)}
+        - Materials: ${JSON.stringify(materials)}
+        - Equipment items: ${equipment.length}
+        - Features: ${features.length}
+        - Manufacturer: ${manufacturer}
+        - Warranty: ${warranty}
+        - Installation: ${JSON.stringify(installation)}`);
+
+      const details: Partial<IDoor> = {
         description,
-        specifications: Object.keys(specifications).length > 0 ? specifications : undefined
+        specifications: Object.keys(specifications).length > 0 ? specifications : undefined,
+        dimensions: Object.keys(dimensions).length > 0 ? dimensions : undefined,
+        materials: Object.keys(materials).length > 0 ? materials : undefined,
+        equipment: equipment.length > 0 ? equipment : undefined,
+        features: features.length > 0 ? features : undefined,
+        manufacturer,
+        warranty,
+        installation: Object.keys(installation).length > 0 ? installation : undefined
       };
+
+      return details;
     } catch (error) {
       this.logger.error(`Error parsing product details at ${url}: ${error.message}`);
       return {};
