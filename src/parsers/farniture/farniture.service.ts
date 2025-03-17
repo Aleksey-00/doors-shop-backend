@@ -323,6 +323,10 @@ export class FarnitureService implements OnModuleInit {
     };
   }
 
+  private normalizeText(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
   private async parseCategory(category: string): Promise<IDoor[]> {
     const url = `${this.baseUrl}/${category}/`;
     const doors: IDoor[] = [];
@@ -330,7 +334,6 @@ export class FarnitureService implements OnModuleInit {
     try {
       this.logger.log(`Starting to parse category: ${category}`);
       
-      // Увеличиваем задержку перед запросом
       await this.delay(5000);
       
       const response = await axios.get(url, {
@@ -342,46 +345,52 @@ export class FarnitureService implements OnModuleInit {
           'Upgrade-Insecure-Requests': '1',
           'Cache-Control': 'max-age=0'
         },
-        timeout: 30000, // Увеличиваем таймаут до 30 секунд
-        maxContentLength: 10 * 1024 * 1024 // Ограничиваем размер ответа 10MB
+        timeout: 30000,
+        maxContentLength: 10 * 1024 * 1024
       });
 
-      // Очищаем response.data после использования
       const html = response.data;
-      response.data = null;
-
       const $ = cheerio.load(html);
-      this.logger.log(`Successfully loaded HTML for category: ${category}`);
 
-      // Очищаем переменную html после загрузки в cheerio
-      html.length = 0;
+      // Удаляем все скрипты и стили
+      $('script').remove();
+      $('style').remove();
+      $('link').remove();
+      $('noscript').remove();
+      $('[data-skip-moving]').remove();
+      $('#bxdynamic_basketitems-component-block_start').remove();
+      $('#bxdynamic_basketitems-component-block_end').remove();
+      $('.cd-modal-bg').remove();
+      $('.burger-dropdown-menu').remove();
+      $('.mega_fixed_menu').remove();
 
-      // Собираем ссылки на подкатегории
+      // Собираем ссылки на подкатегории, исключая служебные элементы
       const subcategoryLinks = new Set<string>();
       $('a').each((_, el) => {
         const href = $(el).attr('href');
-        if (href && href.includes(`/catalog/vkhodnye/${category}/`)) {
+        if (href && 
+            href.includes(`/catalog/vkhodnye/${category}/`) && 
+            !href.includes('?') && 
+            !href.includes('#') && 
+            !href.includes('javascript:')) {
           subcategoryLinks.add(href);
         }
       });
 
-      const uniqueSubcategoryLinks = Array.from(subcategoryLinks)
-        .filter(link => !link.includes('?'));
-      
+      const uniqueSubcategoryLinks = Array.from(subcategoryLinks);
       this.logger.log(`Found ${uniqueSubcategoryLinks.length} unique subcategories in ${category}`);
 
       // Парсим двери на текущей странице
       await this.parseDoors($, category, doors);
 
-      // Очищаем cheerio объект
+      // Очищаем память
       $.root().empty();
+      html.length = 0;
       
-      // Парсим подкатегории с увеличенными интервалами
+      // Парсим подкатегории
       for (const subcategoryUrl of uniqueSubcategoryLinks) {
         try {
           this.logger.log(`Parsing subcategory: ${subcategoryUrl}`);
-          
-          // Увеличиваем задержку между запросами подкатегорий
           await this.delay(10000);
           
           const subcategoryResponse = await axios.get(`https://www.farniture.ru${subcategoryUrl}`, {
@@ -395,21 +404,32 @@ export class FarnitureService implements OnModuleInit {
           });
 
           const subcategoryHtml = subcategoryResponse.data;
-          subcategoryResponse.data = null;
-
           const $subcategory = cheerio.load(subcategoryHtml);
+
+          // Удаляем ненужные элементы
+          $subcategory('script').remove();
+          $subcategory('style').remove();
+          $subcategory('link').remove();
+          $subcategory('noscript').remove();
+          $subcategory('[data-skip-moving]').remove();
+          $subcategory('#bxdynamic_basketitems-component-block_start').remove();
+          $subcategory('#bxdynamic_basketitems-component-block_end').remove();
+          $subcategory('.cd-modal-bg').remove();
+          $subcategory('.burger-dropdown-menu').remove();
+          $subcategory('.mega_fixed_menu').remove();
+
           await this.parseDoors($subcategory, category, doors);
 
-          // Очищаем cheerio объект и HTML
+          // Очищаем память
           $subcategory.root().empty();
           subcategoryHtml.length = 0;
 
-          // Принудительная очистка памяти после каждой подкатегории
           if (global.gc) {
             global.gc();
           }
         } catch (error) {
           this.logger.error(`Error parsing subcategory ${subcategoryUrl}: ${error.message}`);
+          continue;
         }
       }
 
