@@ -53,6 +53,12 @@ export class DoorsController {
     );
   }
 
+  @Get('similar/:id')
+  async findSimilar(@Param('id') id: string) {
+    this.logger.log(`Getting similar doors for id: ${id}`);
+    return this.doorsService.findSimilar(id);
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     this.logger.log(`Getting door with id: ${id}`);

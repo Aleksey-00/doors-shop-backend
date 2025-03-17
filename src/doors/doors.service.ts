@@ -153,6 +153,44 @@ export class DoorsService {
     }
   }
 
+  async findSimilar(id: string): Promise<Door[]> {
+    this.logger.log(`Finding similar doors for id: ${id}`);
+    
+    // Try to get from cache first
+    const cacheKey = `similar:${id}`;
+    const cachedDoors = await this.redisService.get(cacheKey);
+    
+    if (cachedDoors) {
+      this.logger.log(`Found cached similar doors for id: ${id}`);
+      return JSON.parse(cachedDoors);
+    }
+
+    // Get the original door first
+    const door = await this.findOne(id);
+    if (!door) {
+      return [];
+    }
+
+    // Find doors in the same category with similar price range (±20%)
+    const minPrice = door.price * 0.8;
+    const maxPrice = door.price * 1.2;
+
+    const queryBuilder = this.doorRepository.createQueryBuilder('door')
+      .where('door.id != :id', { id })
+      .andWhere('door.category = :category', { category: door.category })
+      .andWhere('door.price BETWEEN :minPrice AND :maxPrice', { minPrice, maxPrice })
+      .orderBy('RANDOM()')
+      .take(4);
+
+    const similarDoors = await queryBuilder.getMany();
+    
+    // Cache the result
+    await this.redisService.set(cacheKey, JSON.stringify(similarDoors));
+    this.logger.log(`Cached similar doors for id: ${id}`);
+
+    return similarDoors;
+  }
+
   private async invalidateCache(): Promise<void> {
     await this.errorHandler.handleCacheOperation(
       async () => {
