@@ -11,22 +11,22 @@ export class Door {
   @Column()
   price: number;
 
-  @Column({ nullable: true })
+  @Column({ name: 'old_price', nullable: true })
   oldPrice?: number;
 
-  @Column({ nullable: true })
+  @Column({ name: 'price_unit', nullable: true })
   priceUnit?: string;
 
   @Column()
   category: string;
 
-  @Column('text', { array: true, nullable: true })
+  @Column('text', { name: 'image_urls', array: true, nullable: true })
   imageUrls: string[];
 
-  @Column('text', { array: true, nullable: true })
+  @Column('text', { name: 'thumbnail_urls', array: true, nullable: true })
   thumbnailUrls?: string[];
 
-  @Column()
+  @Column({ name: 'in_stock' })
   inStock: boolean;
 
   @Column({ nullable: true, type: 'text' })
@@ -38,7 +38,7 @@ export class Door {
   @Column()
   url: string;
 
-  @Column({ unique: true })
+  @Column({ name: 'external_id', unique: true })
   externalId: string;
 
   @Column({ type: 'jsonb', nullable: true })
@@ -79,25 +79,25 @@ export class Door {
     remainingQuantity: number;
   };
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'lock_count', type: 'int', nullable: true })
   lockCount?: number;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({ name: 'metal_thickness', type: 'float', nullable: true })
   metalThickness?: number;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'door_thickness', type: 'int', nullable: true })
   doorThickness?: number;
 
-  @Column({ nullable: true })
+  @Column({ name: 'exterior_finish', nullable: true })
   exteriorFinish?: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'interior_finish', nullable: true })
   interiorFinish?: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'exterior_color', nullable: true })
   exteriorColor?: string;
 
-  @Column({ nullable: true })
+  @Column({ name: 'interior_color', nullable: true })
   interiorColor?: string;
 
   @Column('text', { array: true, nullable: true })
@@ -119,9 +119,9 @@ export class Door {
     count: number;
   };
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 } 
