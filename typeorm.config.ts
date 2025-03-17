@@ -1,6 +1,8 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { Door } from './src/parsers/farniture/entities/door.entity';
+import { Category } from './src/categories/entities/category.entity';
+import { User } from './src/users/entities/user.entity';
 import { CreateTables1710000000000 } from './src/migrations/1710000000000-CreateTables';
 import { CreateOrders1710367200000 } from './src/migrations/1710367200000-CreateOrders';
 import { CreateDoorsTable1710424800000 } from './src/migrations/1710424800000-CreateDoorsTable';
@@ -18,7 +20,7 @@ const dataSource = new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'doors_repair',
-  entities: [Door],
+  entities: [Door, Category, User],
   migrations: [
     CreateTables1710000000000,
     CreateOrders1710367200000,

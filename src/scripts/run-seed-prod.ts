@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { Category } from '../categories/entities/category.entity';
 import { User } from '../users/entities/user.entity';
+import dataSource from '../../typeorm.config';
 
 // Загружаем переменные окружения
 config();
@@ -20,6 +21,11 @@ const adminUser = {
 
 async function seed(dataSource: DataSource) {
   try {
+    // Сначала применяем миграции
+    console.log('Применение миграций...');
+    await dataSource.runMigrations();
+    console.log('Миграции успешно применены');
+
     // Проверяем существование категорий
     const existingCategories = await dataSource.getRepository(Category).find();
     if (existingCategories.length === 0) {
@@ -61,17 +67,6 @@ async function seed(dataSource: DataSource) {
 }
 
 async function main() {
-  const dataSource = new DataSource({
-    type: 'postgres',
-    host: process.env.DB_HOST,
-    port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE || process.env.DB_NAME,
-    entities: [Category, User],
-    synchronize: false,
-  });
-
   try {
     await dataSource.initialize();
     await seed(dataSource);
