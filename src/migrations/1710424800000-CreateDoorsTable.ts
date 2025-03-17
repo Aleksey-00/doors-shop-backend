@@ -76,7 +76,7 @@ export class CreateDoorsTable1710424800000 implements MigrationInterface {
     // Создаем индексы для оптимизации поиска
     await queryRunner.query(`
       CREATE INDEX doors_category_idx ON doors (category);
-      CREATE INDEX doors_external_id_idx ON doors ("externalId");
+      CREATE INDEX doors_external_id_idx ON doors ("external_id");
     `);
   }
 
