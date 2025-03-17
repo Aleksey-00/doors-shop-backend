@@ -68,7 +68,7 @@ export class DoorsService {
     }
 
     if (filters.inStock !== undefined) {
-      queryBuilder.andWhere('door.inStock = :inStock', { inStock: filters.inStock });
+      queryBuilder.andWhere('door.in_stock = :inStock', { inStock: filters.inStock });
     }
 
     // Применяем сортировку
@@ -80,7 +80,7 @@ export class DoorsService {
         queryBuilder.orderBy('door.price', 'DESC');
         break;
       case 'new':
-        queryBuilder.orderBy('door.updatedAt', 'DESC');
+        queryBuilder.orderBy('door.updated_at', 'DESC');
         break;
       case 'popular':
       default:

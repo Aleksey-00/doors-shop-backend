@@ -11,6 +11,7 @@ export class CreateTables1710000000000 implements MigrationInterface {
                 "email" character varying NOT NULL UNIQUE,
                 "password" character varying NOT NULL,
                 "role" character varying NOT NULL DEFAULT 'user',
+                "is_admin" boolean NOT NULL DEFAULT false,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now()
             )
