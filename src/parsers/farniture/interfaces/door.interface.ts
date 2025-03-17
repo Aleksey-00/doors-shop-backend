@@ -2,8 +2,10 @@ export interface IDoor {
   title: string;
   price: number;
   oldPrice?: number;
+  priceUnit?: string;
   category: string;
   imageUrls: string[];
+  thumbnailUrls?: string[];
   inStock: boolean;
   description?: string;
   specifications?: Record<string, string>;
@@ -25,5 +27,27 @@ export interface IDoor {
   installation?: {
     opening?: 'left' | 'right' | 'universal';
     type?: string;
+  };
+  sale?: {
+    endDate: string;
+    remainingQuantity: number;
+  };
+  lockCount?: number;
+  metalThickness?: number;
+  doorThickness?: number;
+  exteriorFinish?: string;
+  interiorFinish?: string;
+  exteriorColor?: string;
+  interiorColor?: string;
+  sizes?: string[];
+  country?: string;
+  brand?: {
+    name: string;
+    logo: string;
+    url: string;
+  };
+  rating?: {
+    value: number;
+    count: number;
   };
 }

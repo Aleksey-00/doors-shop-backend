@@ -14,11 +14,17 @@ export class Door {
   @Column({ nullable: true })
   oldPrice?: number;
 
+  @Column({ nullable: true })
+  priceUnit?: string;
+
   @Column()
   category: string;
 
   @Column('text', { array: true, nullable: true })
   imageUrls: string[];
+
+  @Column('text', { array: true, nullable: true })
+  thumbnailUrls?: string[];
 
   @Column()
   inStock: boolean;
@@ -65,6 +71,52 @@ export class Door {
   installation?: {
     opening?: 'left' | 'right' | 'universal';
     type?: string;
+  };
+
+  @Column({ type: 'jsonb', nullable: true })
+  sale?: {
+    endDate: string;
+    remainingQuantity: number;
+  };
+
+  @Column({ type: 'int', nullable: true })
+  lockCount?: number;
+
+  @Column({ type: 'float', nullable: true })
+  metalThickness?: number;
+
+  @Column({ type: 'int', nullable: true })
+  doorThickness?: number;
+
+  @Column({ nullable: true })
+  exteriorFinish?: string;
+
+  @Column({ nullable: true })
+  interiorFinish?: string;
+
+  @Column({ nullable: true })
+  exteriorColor?: string;
+
+  @Column({ nullable: true })
+  interiorColor?: string;
+
+  @Column('text', { array: true, nullable: true })
+  sizes?: string[];
+
+  @Column({ nullable: true })
+  country?: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  brand?: {
+    name: string;
+    logo: string;
+    url: string;
+  };
+
+  @Column({ type: 'jsonb', nullable: true })
+  rating?: {
+    value: number;
+    count: number;
   };
 
   @CreateDateColumn()
