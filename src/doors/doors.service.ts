@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Door } from '../parsers/farniture/entities/door.entity';
@@ -122,6 +122,7 @@ export class DoorsService {
     
     // Try to get from cache first
     const cacheKey = `door:${id}`;
+    this.logger.log(`Checking cache with key: ${cacheKey}`);
     const cachedDoor = await this.redisService.get(cacheKey);
     
     if (cachedDoor) {
@@ -130,18 +131,26 @@ export class DoorsService {
     }
 
     this.logger.log(`No cached door found, querying database for id: ${id}`);
-    const door = await this.doorRepository.findOneBy({ id });
-    
-    if (!door) {
-      this.logger.warn(`Door with id ${id} not found`);
-      throw new Error(`Door with id ${id} not found`);
+    try {
+      const door = await this.doorRepository.findOneBy({ id });
+      
+      if (!door) {
+        this.logger.warn(`Door with id ${id} not found in database`);
+        throw new NotFoundException(`Door with id ${id} not found`);
+      }
+
+      this.logger.log(`Found door in database: ${JSON.stringify(door)}`);
+
+      // Cache the result
+      await this.redisService.set(cacheKey, JSON.stringify(door));
+      this.logger.log(`Cached door with id: ${id}`);
+
+      return door;
+    } catch (error) {
+      this.logger.error(`Error finding door with id ${id}: ${error.message}`);
+      this.logger.error(error.stack);
+      throw error;
     }
-
-    // Cache the result
-    await this.redisService.set(cacheKey, JSON.stringify(door));
-    this.logger.log(`Cached door with id: ${id}`);
-
-    return door;
   }
 
   private async invalidateCache(): Promise<void> {
