@@ -561,7 +561,29 @@ export class FarnitureService implements OnModuleInit {
       });
 
       const html = response.data;
+      
+      // Проверяем, что ответ не является HTML-страницей с ошибкой
+      if (typeof html !== 'string' || html.includes('<!DOCTYPE html>') && !html.includes('product-detail-gallery')) {
+        throw new Error('Invalid response format - received error page');
+      }
+
+      // Загружаем HTML и удаляем ненужные элементы
       const $ = cheerio.load(html);
+      
+      // Удаляем все скрипты, стили и другие ненужные элементы
+      $('script').remove();
+      $('style').remove();
+      $('link').remove();
+      $('meta').remove();
+      $('.basket_props_block').remove();
+      $('.product-action').remove();
+      $('.product-info-headnote').remove();
+      $('.js-info-block').remove();
+      $('.product-chars').remove();
+      $('.navigation-button-next').remove();
+      $('.navigation-button-prev').remove();
+      $('.product-detail-gallery__slider.thmb').remove();
+      $('.detail-gallery-big').remove();
 
       const details: Partial<IDoor> & { 
         specifications: Record<string, string>;
@@ -589,30 +611,49 @@ export class FarnitureService implements OnModuleInit {
       };
 
       // Парсим основную информацию
-      details.title = $('#pagetitle').text().trim();
+      const title = $('#pagetitle').text().trim();
+      if (!title) {
+        throw new Error('Could not find product title');
+      }
+      details.title = title;
       details.url = url;
 
       // Парсим цены
       const priceBlock = $('.cost.prices.detail');
-      details.price = parseFloat(priceBlock.find('.price_value').first().text().replace(/\s+/g, '')) || 0;
-      details.oldPrice = parseFloat(priceBlock.find('.price.discount .price_value').text().replace(/\s+/g, '')) || undefined;
-      details.priceUnit = priceBlock.find('.price_measure').text().trim() || 'шт';
+      if (priceBlock.length) {
+        const priceText = priceBlock.find('.price_value').first().text().trim();
+        if (priceText) {
+          details.price = parseFloat(priceText.replace(/\s+/g, '')) || 0;
+        }
+        
+        const oldPriceText = priceBlock.find('.price.discount .price_value').text().trim();
+        if (oldPriceText) {
+          details.oldPrice = parseFloat(oldPriceText.replace(/\s+/g, ''));
+        }
+        
+        details.priceUnit = priceBlock.find('.price_measure').text().trim() || 'шт';
+      }
 
       // Парсим акционную информацию
       const saleBlock = $('.view_sale_block');
       if (saleBlock.length > 0) {
-        details.sale = {
-          endDate: saleBlock.find('.active_to').text().trim(),
-          remainingQuantity: parseInt(saleBlock.find('.quantity_block .value').text().trim()) || 0
-        };
+        const endDate = saleBlock.find('.active_to').text().trim();
+        const quantityText = saleBlock.find('.quantity_block .value').text().trim();
+        if (endDate || quantityText) {
+          details.sale = {
+            endDate: endDate || '',
+            remainingQuantity: parseInt(quantityText) || 0
+          };
+        }
       }
 
       // Парсим наличие
       const stockBlock = $('.item-stock');
-      details.inStock = stockBlock.find('.value').text().includes('Есть в наличии');
+      details.inStock = stockBlock.length > 0 && stockBlock.find('.value').text().includes('Есть в наличии');
 
       // Парсим описание
-      details.description = $('.detail-text-wrap').text().trim() || 'Описание отсутствует';
+      const description = $('.detail-text-wrap').text().trim();
+      details.description = description || 'Описание отсутствует';
 
       // Парсим характеристики
       $('.props_list tr').each((_, row) => {
@@ -625,11 +666,20 @@ export class FarnitureService implements OnModuleInit {
 
         // Обработка специфических характеристик
         if (key.includes('количество замков')) {
-          details.lockCount = parseInt(value) || 1;
+          const lockCount = parseInt(value);
+          if (!isNaN(lockCount)) {
+            details.lockCount = lockCount;
+          }
         } else if (key.includes('толщина металла')) {
-          details.metalThickness = parseFloat(value) || 1.5;
+          const thickness = parseFloat(value);
+          if (!isNaN(thickness)) {
+            details.metalThickness = thickness;
+          }
         } else if (key.includes('толщина полотна')) {
-          details.doorThickness = parseInt(value) || 60;
+          const doorThickness = parseInt(value);
+          if (!isNaN(doorThickness)) {
+            details.doorThickness = doorThickness;
+          }
         } else if (key.includes('наружная отделка')) {
           details.exteriorFinish = value;
         } else if (key.includes('внутренняя отделка')) {
@@ -639,55 +689,75 @@ export class FarnitureService implements OnModuleInit {
         } else if (key.includes('цвет снаружи')) {
           details.exteriorColor = value;
         } else if (key.includes('размеры')) {
-          details.sizes = value.split(',').map(size => size.trim());
+          details.sizes = value.split(',').map(size => size.trim()).filter(Boolean);
         } else if (key.includes('страна')) {
           details.country = value;
         }
       });
 
       // Парсим изображения
-      details.imageUrls = [];
-      details.thumbnailUrls = [];
-
-      // Основное изображение
       const mainImage = $('.product-detail-gallery__picture').attr('src');
       if (mainImage) {
-        details.imageUrls.push(this.normalizeImageUrl(mainImage));
+        const normalizedUrl = this.normalizeImageUrl(mainImage);
+        if (normalizedUrl) {
+          details.imageUrls.push(normalizedUrl);
+        }
       }
 
       // Дополнительные изображения
       $('.product-detail-gallery__link').each((_, element) => {
         const imgUrl = $(element).attr('href');
         const thumbUrl = $(element).attr('data-thumb');
+        
         if (imgUrl) {
-          details.imageUrls.push(this.normalizeImageUrl(imgUrl));
+          const normalizedImgUrl = this.normalizeImageUrl(imgUrl);
+          if (normalizedImgUrl && !details.imageUrls.includes(normalizedImgUrl)) {
+            details.imageUrls.push(normalizedImgUrl);
+          }
         }
+        
         if (thumbUrl) {
-          details.thumbnailUrls.push(this.normalizeImageUrl(thumbUrl));
+          const normalizedThumbUrl = this.normalizeImageUrl(thumbUrl);
+          if (normalizedThumbUrl && !details.thumbnailUrls.includes(normalizedThumbUrl)) {
+            details.thumbnailUrls.push(normalizedThumbUrl);
+          }
         }
       });
 
       // Парсим информацию о бренде
       const brandBlock = $('.brand');
       if (brandBlock.length > 0) {
-        details.brand = {
-          name: brandBlock.find('meta[itemprop="name"]').attr('content') || 'Не указан',
-          logo: this.normalizeImageUrl(brandBlock.find('img').attr('src') || ''),
-          url: brandBlock.find('a').attr('href') || ''
-        };
+        const brandName = brandBlock.find('meta[itemprop="name"]').attr('content');
+        const brandLogo = brandBlock.find('img').attr('src');
+        const brandUrl = brandBlock.find('a').attr('href');
+        
+        if (brandName || brandLogo || brandUrl) {
+          details.brand = {
+            name: brandName || 'Не указан',
+            logo: brandLogo ? this.normalizeImageUrl(brandLogo) : '',
+            url: brandUrl || ''
+          };
+        }
       }
 
       // Парсим рейтинг и отзывы
       const ratingBlock = $('.rating');
       if (ratingBlock.length > 0) {
-        details.rating = {
-          value: parseFloat(ratingBlock.find('meta[itemprop="ratingValue"]').attr('content') || '0'),
-          count: parseInt(ratingBlock.find('meta[itemprop="reviewCount"]').attr('content') || '0')
-        };
+        const ratingValue = parseFloat(ratingBlock.find('meta[itemprop="ratingValue"]').attr('content') || '0');
+        const reviewCount = parseInt(ratingBlock.find('meta[itemprop="reviewCount"]').attr('content') || '0');
+        
+        if (!isNaN(ratingValue) || !isNaN(reviewCount)) {
+          details.rating = {
+            value: ratingValue,
+            count: reviewCount
+          };
+        }
       }
 
-      // Парсим комплектацию
+      // Парсим комплектацию и особенности
       const equipmentItems = new Set<string>();
+      const featureItems = new Set<string>();
+
       $('.complectation_list li, .equipment_list li').each((_, element) => {
         const item = $(element).text().trim();
         if (item) {
@@ -695,8 +765,6 @@ export class FarnitureService implements OnModuleInit {
         }
       });
 
-      // Парсим особенности
-      const featureItems = new Set<string>();
       $('.features_list li, .advantages_list li').each((_, element) => {
         const feature = $(element).text().trim();
         if (feature) {
@@ -704,12 +772,16 @@ export class FarnitureService implements OnModuleInit {
         }
       });
 
-      details.equipment = Array.from(equipmentItems);
-      details.features = Array.from(featureItems);
+      if (equipmentItems.size > 0) {
+        details.equipment = Array.from(equipmentItems);
+      }
+
+      if (featureItems.size > 0) {
+        details.features = Array.from(featureItems);
+      }
 
       // Очищаем память
       $.root().empty();
-      html.length = 0;
 
       return this.validateAndCleanDetails(details);
     } catch (error) {
