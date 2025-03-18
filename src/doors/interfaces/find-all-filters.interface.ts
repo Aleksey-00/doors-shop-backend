@@ -6,4 +6,5 @@ export interface FindAllFilters {
   sort?: 'popular' | 'price_asc' | 'price_desc' | 'new';
   page?: number;
   limit?: number;
+  search?: string;
 } 

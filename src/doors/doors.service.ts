@@ -16,6 +16,7 @@ interface FindAllFilters {
   sort?: 'popular' | 'price_asc' | 'price_desc' | 'new';
   page?: number;
   limit?: number;
+  search?: string;
 }
 
 @Injectable()
@@ -44,18 +45,19 @@ export class DoorsService {
       });
   }
 
-  async findAll(
-    page: number = 1,
-    limit: number = 12,
-    category?: string,
-    search?: string,
-    minPrice?: number,
-    maxPrice?: number,
-    inStock?: boolean,
-    sortBy?: string,
-    sortOrder: 'ASC' | 'DESC' = 'DESC',
-  ) {
+  async findAll(filters: FindAllFilters) {
     try {
+      const {
+        page = 1,
+        limit = 12,
+        category,
+        search,
+        priceMin,
+        priceMax,
+        inStock,
+        sort
+      } = filters;
+
       const queryBuilder = this.doorRepository
         .createQueryBuilder('door')
         .leftJoinAndSelect('door.category', 'category')
@@ -78,11 +80,11 @@ export class DoorsService {
       }
 
       // Фильтр по цене
-      if (minPrice !== undefined) {
-        queryBuilder.andWhere('door.price >= :minPrice', { minPrice });
+      if (priceMin !== undefined) {
+        queryBuilder.andWhere('door.price >= :priceMin', { priceMin });
       }
-      if (maxPrice !== undefined) {
-        queryBuilder.andWhere('door.price <= :maxPrice', { maxPrice });
+      if (priceMax !== undefined) {
+        queryBuilder.andWhere('door.price <= :priceMax', { priceMax });
       }
 
       // Фильтр по наличию
@@ -91,8 +93,23 @@ export class DoorsService {
       }
 
       // Сортировка
-      if (sortBy) {
-        queryBuilder.orderBy(`door.${sortBy}`, sortOrder);
+      if (sort) {
+        switch (sort) {
+          case 'price_asc':
+            queryBuilder.orderBy('door.price', 'ASC');
+            break;
+          case 'price_desc':
+            queryBuilder.orderBy('door.price', 'DESC');
+            break;
+          case 'popular':
+            queryBuilder.orderBy('door.views', 'DESC');
+            break;
+          case 'new':
+            queryBuilder.orderBy('door.createdAt', 'DESC');
+            break;
+          default:
+            queryBuilder.orderBy('door.createdAt', 'DESC');
+        }
       } else {
         queryBuilder.orderBy('door.createdAt', 'DESC');
       }
