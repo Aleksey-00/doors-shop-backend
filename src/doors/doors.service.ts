@@ -6,6 +6,7 @@ import { RedisService } from '../redis/redis.service';
 import { In } from 'typeorm';
 import { ErrorHandler } from '../utils/error-handler';
 import { Category } from '../categories/entities/category.entity';
+import * as crypto from 'crypto';
 
 interface FindAllFilters {
   category?: string;
@@ -206,7 +207,7 @@ export class DoorsService {
       const updates = doors.map(async (door) => {
         try {
           if (door.title.includes(searchText)) {
-            const uuid = require('crypto').randomUUID().substring(0, 7);
+            const uuid = crypto.randomUUID().substring(0, 7);
             const regex = new RegExp(searchText, 'g');
             const newTitle = door.title.replace(regex, `${replaceText} ${uuid}`);
             door.title = newTitle;
