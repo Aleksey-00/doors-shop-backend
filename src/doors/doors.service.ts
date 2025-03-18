@@ -44,73 +44,80 @@ export class DoorsService {
       });
   }
 
-  async findAll(filters: FindAllFilters = {}): Promise<{ doors: Door[], totalPages: number, currentPage: number, totalDoors: number }> {
-    this.logger.log(`Finding doors with filters: ${JSON.stringify(filters)}`);
-    
-    const queryBuilder = this.doorRepository.createQueryBuilder('door')
-      .leftJoinAndSelect('door.category', 'category');
-
-    if (filters.category) {
-      queryBuilder.andWhere('category.name = :category', { category: filters.category });
-    }
-
-    if (filters.priceMin) {
-      queryBuilder.andWhere('door.price >= :priceMin', { priceMin: filters.priceMin });
-    }
-
-    if (filters.priceMax) {
-      queryBuilder.andWhere('door.price <= :priceMax', { priceMax: filters.priceMax });
-    }
-
-    if (filters.inStock !== undefined) {
-      queryBuilder.andWhere('door.inStock = :inStock', { inStock: filters.inStock });
-    }
-
-    switch (filters.sort) {
-      case 'popular':
-        queryBuilder.orderBy('door.createdAt', 'DESC');
-        break;
-      case 'price_asc':
-        queryBuilder.orderBy('door.price', 'ASC');
-        break;
-      case 'price_desc':
-        queryBuilder.orderBy('door.price', 'DESC');
-        break;
-      case 'new':
-        queryBuilder.orderBy('door.createdAt', 'DESC');
-        break;
-      default:
-        queryBuilder.orderBy('door.createdAt', 'DESC');
-    }
-
+  async findAll(
+    page: number = 1,
+    limit: number = 12,
+    category?: string,
+    search?: string,
+    minPrice?: number,
+    maxPrice?: number,
+    inStock?: boolean,
+    sortBy?: string,
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ) {
     try {
+      const queryBuilder = this.doorRepository
+        .createQueryBuilder('door')
+        .leftJoinAndSelect('door.category', 'category')
+        .where('1=1');
+
+      // Фильтр по категории
+      if (category) {
+        const categoryId = parseInt(category);
+        if (!isNaN(categoryId) && categoryId >= 1 && categoryId <= 3) {
+          queryBuilder.andWhere('door.categoryId = :categoryId', { categoryId });
+        }
+      }
+
+      // Фильтр по поиску
+      if (search) {
+        queryBuilder.andWhere(
+          '(LOWER(door.title) LIKE LOWER(:search) OR LOWER(door.description) LIKE LOWER(:search))',
+          { search: `%${search}%` },
+        );
+      }
+
+      // Фильтр по цене
+      if (minPrice !== undefined) {
+        queryBuilder.andWhere('door.price >= :minPrice', { minPrice });
+      }
+      if (maxPrice !== undefined) {
+        queryBuilder.andWhere('door.price <= :maxPrice', { maxPrice });
+      }
+
+      // Фильтр по наличию
+      if (inStock !== undefined) {
+        queryBuilder.andWhere('door.inStock = :inStock', { inStock });
+      }
+
+      // Сортировка
+      if (sortBy) {
+        queryBuilder.orderBy(`door.${sortBy}`, sortOrder);
+      } else {
+        queryBuilder.orderBy('door.createdAt', 'DESC');
+      }
+
       // Получаем общее количество дверей
       const totalDoors = await queryBuilder.getCount();
-      
-      // Устанавливаем значения по умолчанию для пагинации
-      const page = filters.page || 1;
-      const limit = filters.limit || 12;
-      
+
+      // Применяем пагинацию
+      queryBuilder.skip((page - 1) * limit).take(limit);
+
+      // Получаем двери с пагинацией
+      const doors = await queryBuilder.getMany();
+
       // Вычисляем общее количество страниц
       const totalPages = Math.ceil(totalDoors / limit);
-      
-      // Добавляем пагинацию
-      queryBuilder.skip((page - 1) * limit).take(limit);
-      
-      // Получаем двери для текущей страницы
-      const doors = await queryBuilder.getMany();
-      
-      this.logger.log(`Found ${doors.length} doors on page ${page} of ${totalPages}`);
-      
+
       return {
         doors,
         totalPages,
         currentPage: page,
-        totalDoors
+        totalDoors,
       };
     } catch (error) {
-      this.logger.error(`Error finding doors: ${error.message}`);
-      throw error;
+      console.error('Error in findAll:', error);
+      throw new Error('Failed to fetch doors');
     }
   }
 
