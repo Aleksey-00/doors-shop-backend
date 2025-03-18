@@ -9,13 +9,13 @@ export class Door {
   @Column()
   title: string;
 
-  @Column()
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ name: 'old_price', nullable: true })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, name: 'old_price' })
   oldPrice?: number;
 
-  @Column({ name: 'price_unit', nullable: true })
+  @Column({ default: '₽', name: 'price_unit' })
   priceUnit?: string;
 
   @ManyToOne(() => Category)
@@ -25,16 +25,16 @@ export class Door {
   @Column({ name: 'category_id' })
   categoryId: number;
 
-  @Column('text', { name: 'image_urls', array: true, nullable: true })
+  @Column('text', { array: true, default: '{}', name: 'image_urls' })
   imageUrls: string[];
 
-  @Column('text', { name: 'thumbnail_urls', array: true, nullable: true })
-  thumbnailUrls?: string[];
+  @Column('text', { array: true, default: '{}', name: 'thumbnail_urls' })
+  thumbnailUrls: string[];
 
-  @Column({ name: 'in_stock', default: true })
+  @Column({ default: true, name: 'in_stock' })
   inStock: boolean;
 
-  @Column({ nullable: true, type: 'text' })
+  @Column({ type: 'text', nullable: true })
   description?: string;
 
   @Column({ type: 'jsonb', nullable: true })
@@ -43,28 +43,20 @@ export class Door {
   @Column()
   url: string;
 
-  @Column({ name: 'external_id', unique: true })
-  externalId: string;
+  @Column({ nullable: true, name: 'external_id' })
+  externalId?: string;
 
   @Column({ type: 'jsonb', nullable: true })
-  dimensions?: {
-    width?: number;
-    height?: number;
-    depth?: number;
-  };
+  dimensions?: object;
 
   @Column({ type: 'jsonb', nullable: true })
-  materials?: {
-    frame?: string;
-    coating?: string;
-    insulation?: string;
-  };
+  materials?: object;
 
-  @Column('text', { array: true, nullable: true })
-  equipment?: string[];
+  @Column({ type: 'jsonb', nullable: true })
+  equipment?: object;
 
-  @Column('text', { array: true, nullable: true })
-  features?: string[];
+  @Column({ type: 'jsonb', nullable: true })
+  features?: object;
 
   @Column({ nullable: true })
   manufacturer?: string;
@@ -72,57 +64,47 @@ export class Door {
   @Column({ nullable: true })
   warranty?: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  installation?: {
-    opening?: 'left' | 'right' | 'universal';
-    type?: string;
-  };
+  @Column({ nullable: true })
+  installation?: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  sale?: {
-    endDate: string;
-    remainingQuantity: number;
-  };
+  @Column({ default: false })
+  sale?: boolean;
 
-  @Column({ name: 'lock_count', type: 'int', nullable: true })
+  @Column({ nullable: true, name: 'lock_count' })
   lockCount?: number;
 
-  @Column({ name: 'metal_thickness', type: 'float', nullable: true })
-  metalThickness?: number;
+  @Column({ nullable: true, name: 'metal_thickness' })
+  metalThickness?: string;
 
-  @Column({ name: 'door_thickness', type: 'int', nullable: true })
-  doorThickness?: number;
+  @Column({ nullable: true, name: 'door_thickness' })
+  doorThickness?: string;
 
-  @Column({ name: 'exterior_finish', nullable: true })
+  @Column({ nullable: true, name: 'exterior_finish' })
   exteriorFinish?: string;
 
-  @Column({ name: 'interior_finish', nullable: true })
+  @Column({ nullable: true, name: 'interior_finish' })
   interiorFinish?: string;
 
-  @Column({ name: 'exterior_color', nullable: true })
+  @Column({ nullable: true, name: 'exterior_color' })
   exteriorColor?: string;
 
-  @Column({ name: 'interior_color', nullable: true })
+  @Column({ nullable: true, name: 'interior_color' })
   interiorColor?: string;
 
-  @Column('text', { array: true, nullable: true })
-  sizes?: string[];
+  @Column({ type: 'jsonb', nullable: true })
+  sizes?: object;
 
   @Column({ nullable: true })
   country?: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  brand?: {
-    name: string;
-    logo: string;
-    url: string;
-  };
+  @Column({ nullable: true })
+  brand?: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  rating?: {
-    value: number;
-    count: number;
-  };
+  @Column({ nullable: true, type: 'decimal', precision: 2, scale: 1 })
+  rating?: number;
+
+  @Column({ default: 0 })
+  views: number;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

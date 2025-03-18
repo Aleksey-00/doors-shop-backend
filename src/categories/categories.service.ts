@@ -11,7 +11,19 @@ export class CategoriesService {
   ) {}
 
   async findAll(): Promise<Category[]> {
-    return this.categoryRepository.find();
+    // Фильтруем категории, оставляя только "премиум", "стандарт" и "эконом"
+    const allowedCategories = ['премиум', 'стандарт', 'эконом'];
+    
+    return this.categoryRepository.find({
+      where: [
+        { name: allowedCategories[0] },
+        { name: allowedCategories[1] },
+        { name: allowedCategories[2] }
+      ],
+      order: {
+        name: 'ASC'
+      }
+    });
   }
 
   async findOne(id: number): Promise<Category | null> {

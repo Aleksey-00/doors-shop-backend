@@ -66,7 +66,7 @@ export class DoorsService {
 
     switch (filters.sort) {
       case 'popular':
-        queryBuilder.orderBy('door.views', 'DESC');
+        queryBuilder.orderBy('door.createdAt', 'DESC');
         break;
       case 'price_asc':
         queryBuilder.orderBy('door.price', 'ASC');
@@ -101,6 +101,10 @@ export class DoorsService {
     
     if (cachedDoor) {
       this.logger.log(`Found cached door with id: ${id}`);
+      // Увеличиваем счетчик просмотров асинхронно, не ждем завершения
+      this.incrementViews(id).catch(err => 
+        this.logger.error(`Error incrementing views for door ${id}: ${err.message}`)
+      );
       return JSON.parse(cachedDoor);
     }
 
@@ -118,6 +122,11 @@ export class DoorsService {
 
       this.logger.log(`Found door in database: ${JSON.stringify(door)}`);
 
+      // Увеличиваем счетчик просмотров асинхронно, не ждем завершения
+      this.incrementViews(id).catch(err => 
+        this.logger.error(`Error incrementing views for door ${id}: ${err.message}`)
+      );
+
       // Cache the result
       await this.redisService.set(cacheKey, JSON.stringify(door));
       this.logger.log(`Cached door with id: ${id}`);
@@ -126,6 +135,28 @@ export class DoorsService {
     } catch (error) {
       this.logger.error(`Error finding door with id ${id}: ${error.message}`);
       this.logger.error(error.stack);
+      throw error;
+    }
+  }
+
+  // Метод для увеличения счетчика просмотров двери
+  private async incrementViews(id: string): Promise<void> {
+    try {
+      await this.doorRepository.createQueryBuilder()
+        .update(Door)
+        .set({ 
+          views: () => 'views + 1' 
+        })
+        .where('id = :id', { id })
+        .execute();
+      
+      this.logger.log(`Incremented views count for door ${id}`);
+      
+      // Инвалидируем кэш для двери
+      const cacheKey = `door:${id}`;
+      await this.redisService.del(cacheKey);
+    } catch (error) {
+      this.logger.error(`Failed to increment views for door ${id}: ${error.message}`);
       throw error;
     }
   }
