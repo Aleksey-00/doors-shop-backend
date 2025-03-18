@@ -5,30 +5,22 @@ const path = require('path');
 
 console.log('Loading polyfill.js...');
 
+// Безопасная функция генерации UUID, не требующая crypto.randomBytes
+function safeGenerateUUID() {
+  // Чистый JavaScript без зависимостей от crypto
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, 
+          v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Полифилл для crypto.randomUUID
 if (!crypto.randomUUID) {
   console.log('Adding crypto.randomUUID polyfill...');
   
   try {
-    crypto.randomUUID = function() {
-      if (crypto.randomBytes) {
-        // Используем crypto.randomBytes если доступно
-        const rb = crypto.randomBytes(16);
-        rb[6] = (rb[6] & 0x0f) | 0x40;
-        rb[8] = (rb[8] & 0x3f) | 0x80;
-        const hex = rb.toString('hex');
-        return hex.substring(0, 8) + '-' + hex.substring(8, 12) + '-' + 
-              hex.substring(12, 16) + '-' + hex.substring(16, 20) + '-' + 
-              hex.substring(20, 32);
-      } else {
-        // Резервный вариант
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0, 
-                v = c == 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
-      }
-    };
+    crypto.randomUUID = safeGenerateUUID;
     console.log('Successfully added crypto.randomUUID polyfill');
   } catch (e) {
     console.error('Failed to add crypto.randomUUID polyfill:', e);
@@ -43,27 +35,38 @@ try {
   if (fs.existsSync(typeormUtilsPath)) {
     let content = fs.readFileSync(typeormUtilsPath, 'utf8');
     
-    // Заменяем вызов crypto.randomUUID() на нашу собственную реализацию
+    // Заменяем вызов crypto.randomUUID() на безопасную реализацию
     if (content.includes('crypto.randomUUID()')) {
       content = content.replace(
         'const generateString = () => crypto.randomUUID();',
         `const generateString = () => {
-          // Используем полифилл для randomUUID если оригинальный метод недоступен
-          if (!crypto.randomUUID) {
-            const rb = crypto.randomBytes(16);
-            rb[6] = (rb[6] & 0x0f) | 0x40;
-            rb[8] = (rb[8] & 0x3f) | 0x80;
-            const hex = rb.toString('hex');
-            return hex.substring(0, 8) + '-' + hex.substring(8, 12) + '-' + 
-                  hex.substring(12, 16) + '-' + hex.substring(16, 20) + '-' + 
-                  hex.substring(20, 32);
-          }
-          return crypto.randomUUID();
+          // Чистый JavaScript без зависимостей от crypto
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, 
+                  v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
         };`
       );
       
       fs.writeFileSync(typeormUtilsPath, content, 'utf8');
       console.log('Successfully patched @nestjs/typeorm module');
+    } else if (content.includes('crypto.randomBytes')) {
+      // Если предыдущий патч уже применен, но использует crypto.randomBytes
+      content = content.replace(
+        /const generateString = \(\) => \{ try \{ return crypto\.randomUUID\(\); \} catch \(e\) \{ const rb = crypto\.randomBytes\(16\);[^}]*\} \};/g,
+        `const generateString = () => {
+          // Чистый JavaScript без зависимостей от crypto
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, 
+                  v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };`
+      );
+      
+      fs.writeFileSync(typeormUtilsPath, content, 'utf8');
+      console.log('Successfully patched @nestjs/typeorm module (replaced existing patch)');
     } else {
       console.log('No need to patch @nestjs/typeorm (pattern not found)');
     }
