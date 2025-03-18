@@ -3,7 +3,7 @@ export interface IDoor {
   price: number;
   oldPrice?: number;
   priceUnit?: string;
-  category: string;
+  categoryId: number;
   imageUrls: string[];
   thumbnailUrls?: string[];
   inStock: boolean;

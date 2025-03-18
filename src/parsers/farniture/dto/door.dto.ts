@@ -2,12 +2,13 @@ export class CreateDoorDto {
   title: string;
   price: number;
   oldPrice?: number;
-  category: string;
-  imageUrls: string[];
-  inStock: boolean;
-  description?: string;
-  specifications?: Record<string, string>;
+  categoryId: number;
   url: string;
+  inStock?: boolean;
+  images?: string[];
+  description?: string;
+  characteristics?: Record<string, string>;
+  externalId?: string;
 }
 
 export class UpdateDoorDto extends CreateDoorDto {} 

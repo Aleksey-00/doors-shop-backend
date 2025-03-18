@@ -1,2 +1,11 @@
 import * as crypto from 'crypto';
-global.crypto = crypto as any;
+
+if (!global.crypto) {
+    Object.defineProperty(global, 'crypto', {
+        value: {
+            getRandomValues: (buffer: Uint8Array) => {
+                return crypto.randomFillSync(buffer);
+            }
+        }
+    });
+}

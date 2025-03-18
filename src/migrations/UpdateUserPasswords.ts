@@ -14,7 +14,7 @@ export class UpdateUserPasswords1710587682123 implements MigrationInterface {
             const hashedPassword = crypto.createHash('sha256').update(defaultPassword).digest('hex');
             
             await queryRunner.query(
-                'UPDATE users SET password = ? WHERE id = ?',
+                'UPDATE users SET password = $1 WHERE id = $2',
                 [hashedPassword, user.id]
             );
         }

@@ -5,6 +5,7 @@ import { Door } from '../parsers/farniture/entities/door.entity';
 import { RedisService } from '../redis/redis.service';
 import { In } from 'typeorm';
 import { ErrorHandler } from '../utils/error-handler';
+import { Category } from '../categories/entities/category.entity';
 
 interface FindAllFilters {
   category?: string;
@@ -22,6 +23,8 @@ export class DoorsService {
   constructor(
     @InjectRepository(Door)
     private readonly doorRepository: Repository<Door>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
     private readonly redisService: RedisService,
   ) {
     this.errorHandler = new ErrorHandler(this.logger);
@@ -38,41 +41,32 @@ export class DoorsService {
       });
   }
 
-  async findAll(page: number = 1, limit: number = 10, filters: FindAllFilters = {}): Promise<{ doors: Door[]; total: number; totalPages: number }> {
-    this.logger.log(`Finding doors with page=${page}, limit=${limit}, filters=${JSON.stringify(filters)}`);
+  async findAll(filters: FindAllFilters = {}): Promise<Door[]> {
+    this.logger.log(`Finding doors with filters: ${JSON.stringify(filters)}`);
     
-    // Пробуем получить данные из кэша
-    const cacheKey = `doors:list:${page}:${limit}:${JSON.stringify(filters)}`;
-    const cachedData = await this.redisService.get(cacheKey);
-    
-    if (cachedData) {
-      this.logger.log(`Found cached data for key: ${cacheKey}`);
-      return JSON.parse(cachedData);
-    }
+    const queryBuilder = this.doorRepository.createQueryBuilder('door')
+      .leftJoinAndSelect('door.category', 'category');
 
-    this.logger.log('No cached data found, querying database');
-    
-    const queryBuilder = this.doorRepository.createQueryBuilder('door');
-
-    // Применяем фильтры
     if (filters.category) {
-      queryBuilder.where('door.category ILIKE :category', { category: `%${filters.category}%` });
+      queryBuilder.andWhere('category.name = :category', { category: filters.category });
     }
 
-    if (filters.priceMin !== undefined) {
+    if (filters.priceMin) {
       queryBuilder.andWhere('door.price >= :priceMin', { priceMin: filters.priceMin });
     }
 
-    if (filters.priceMax !== undefined) {
+    if (filters.priceMax) {
       queryBuilder.andWhere('door.price <= :priceMax', { priceMax: filters.priceMax });
     }
 
     if (filters.inStock !== undefined) {
-      queryBuilder.andWhere('door.in_stock = :inStock', { inStock: filters.inStock });
+      queryBuilder.andWhere('door.inStock = :inStock', { inStock: filters.inStock });
     }
 
-    // Применяем сортировку
     switch (filters.sort) {
+      case 'popular':
+        queryBuilder.orderBy('door.views', 'DESC');
+        break;
       case 'price_asc':
         queryBuilder.orderBy('door.price', 'ASC');
         break;
@@ -80,39 +74,18 @@ export class DoorsService {
         queryBuilder.orderBy('door.price', 'DESC');
         break;
       case 'new':
-        queryBuilder.orderBy('door.updated_at', 'DESC');
+        queryBuilder.orderBy('door.createdAt', 'DESC');
         break;
-      case 'popular':
       default:
-        // По умолчанию сортируем по ID в обратном порядке (самые новые первыми)
-        queryBuilder.orderBy('door.id', 'DESC');
-        break;
+        queryBuilder.orderBy('door.createdAt', 'DESC');
     }
 
-    // Применяем пагинацию
-    queryBuilder
-      .skip((page - 1) * limit)
-      .take(limit);
-
     try {
-      this.logger.log(`Executing query: ${queryBuilder.getSql()}`);
-      const [doors, total] = await queryBuilder.getManyAndCount();
-      this.logger.log(`Query result: ${doors.length} doors found, total: ${total}`);
-
-      const result = {
-        doors,
-        total,
-        totalPages: Math.ceil(total / limit),
-      };
-
-      // Кэшируем результат
-      await this.redisService.set(cacheKey, JSON.stringify(result));
-      this.logger.log(`Cached result with key: ${cacheKey}`);
-
-      return result;
+      const doors = await queryBuilder.getMany();
+      this.logger.log(`Found ${doors.length} doors`);
+      return doors;
     } catch (error) {
-      this.logger.error(`Error executing query: ${error.message}`);
-      this.logger.error(error.stack);
+      this.logger.error(`Error finding doors: ${error.message}`);
       throw error;
     }
   }
@@ -132,7 +105,10 @@ export class DoorsService {
 
     this.logger.log(`No cached door found, querying database for id: ${id}`);
     try {
-      const door = await this.doorRepository.findOneBy({ id });
+      const door = await this.doorRepository.findOne({
+        where: { id },
+        relations: ['category']
+      });
       
       if (!door) {
         this.logger.warn(`Door with id ${id} not found in database`);
@@ -177,7 +153,7 @@ export class DoorsService {
 
     const queryBuilder = this.doorRepository.createQueryBuilder('door')
       .where('door.id != :id', { id })
-      .andWhere('door.category = :category', { category: door.category })
+      .andWhere('door.categoryId = :categoryId', { categoryId: door.categoryId })
       .andWhere('door.price BETWEEN :minPrice AND :maxPrice', { minPrice, maxPrice })
       .orderBy('RANDOM()')
       .take(4);
@@ -222,7 +198,7 @@ export class DoorsService {
   async updateTitlesInCategory(category: string, searchText: string, replaceText: string) {
     try {
       const doors = await this.doorRepository.find({
-        where: { category },
+        where: { categoryId: await this.getCategoryId(category) },
       });
 
       this.logger.log(`Found ${doors.length} doors in category "${category}" for title update`);
@@ -274,7 +250,7 @@ export class DoorsService {
       const queryBuilder = this.doorRepository.createQueryBuilder('door');
 
       if (category) {
-        queryBuilder.where('door.category = :category', { category });
+        queryBuilder.where('door.categoryId = :categoryId', { categoryId: await this.getCategoryId(category) });
       }
 
       // Получаем только ID дверей для пакетной обработки
@@ -324,5 +300,17 @@ export class DoorsService {
       this.logger.error(error.stack);
       return { success: false, message: `Ошибка при обновлении цен: ${error.message}` };
     }
+  }
+
+  private async getCategoryId(categoryName: string): Promise<number> {
+    const category = await this.categoryRepository.findOne({
+      where: { name: categoryName }
+    });
+    
+    if (!category) {
+      throw new NotFoundException(`Category ${categoryName} not found`);
+    }
+    
+    return category.id;
   }
 } 

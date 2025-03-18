@@ -5,10 +5,11 @@ import { FarnitureService } from './farniture.service';
 import { FarnitureController } from './farniture.controller';
 import { Door } from './entities/door.entity';
 import { RedisModule } from '../../redis/redis.module';
+import { Category } from '../../categories/entities/category.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Door]),
+    TypeOrmModule.forFeature([Door, Category]),
     ScheduleModule.forRoot(),
     RedisModule,
   ],

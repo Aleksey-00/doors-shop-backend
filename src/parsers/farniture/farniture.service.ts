@@ -10,6 +10,7 @@ import { Door } from './entities/door.entity';
 import { IDoor } from './interfaces/door.interface';
 import { RedisService } from '../../redis/redis.service';
 import { CreateDoorDto, UpdateDoorDto } from './dto';
+import { Category } from '../../categories/entities/category.entity';
 
 @Injectable()
 export class FarnitureService implements OnModuleInit {
@@ -33,6 +34,8 @@ export class FarnitureService implements OnModuleInit {
   constructor(
     @InjectRepository(Door)
     private readonly doorRepository: Repository<Door>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
     private schedulerRegistry: SchedulerRegistry,
     private readonly redisService: RedisService
   ) {
@@ -171,6 +174,10 @@ export class FarnitureService implements OnModuleInit {
       let totalParsedDoors = 0;
       let totalSavedDoors = 0;
       
+      // Получаем все категории из базы данных
+      const categories = await this.categoryRepository.find();
+      const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
+      
       // Обрабатываем категории последовательно с большими интервалами
       for (const category of categoriesToParse) {
         try {
@@ -228,7 +235,7 @@ export class FarnitureService implements OnModuleInit {
     let savedCount = 0;
     
     // Разбиваем двери на пакеты для снижения нагрузки на БД
-    const batchSize = 10; // Увеличиваем размер пакета с 5 до 10
+    const batchSize = 10;
     const batches: IDoor[][] = [];
     
     for (let i = 0; i < doors.length; i += batchSize) {
@@ -253,7 +260,7 @@ export class FarnitureService implements OnModuleInit {
           const externalId = this.generateExternalId(doorData);
           
           // Проверяем обязательные поля
-          if (!doorData.title || !doorData.price || !doorData.category || !doorData.url) {
+          if (!doorData.title || !doorData.price || !doorData.categoryId || !doorData.url) {
             this.logger.error(`[Parser] Missing required fields for door: ${JSON.stringify(doorData)}`);
             continue;
           }
@@ -266,6 +273,7 @@ export class FarnitureService implements OnModuleInit {
             inStock: doorData.inStock || false,
             description: doorData.description || '',
             specifications: doorData.specifications || {},
+            category: { id: doorData.categoryId }
           };
 
           // Сохраняем в базу данных
@@ -292,7 +300,6 @@ export class FarnitureService implements OnModuleInit {
           }
         } catch (error) {
           this.logger.error(`[Parser] Error saving door: ${error.message}`);
-          // Продолжаем с следующей дверью
           continue;
         }
       }
@@ -312,7 +319,7 @@ export class FarnitureService implements OnModuleInit {
   private getDoorHashData(door: IDoor) {
     return {
       title: door.title,
-      category: door.category,
+      categoryId: door.categoryId,
       url: door.url,
       price: door.price,
       oldPrice: door.oldPrice,
@@ -334,40 +341,14 @@ export class FarnitureService implements OnModuleInit {
     try {
       this.logger.log(`Starting to parse category: ${category}`);
       
-      await this.delay(5000);
+      // Получаем первую страницу категории
+      const mainPageHtml = await this.fetchPage(url);
+      const $mainPage = cheerio.load(mainPageHtml);
       
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-          'Cache-Control': 'max-age=0'
-        },
-        timeout: 30000,
-        maxContentLength: 10 * 1024 * 1024
-      });
-
-      const html = response.data;
-      const $ = cheerio.load(html);
-
-      // Удаляем все скрипты и стили
-      $('script').remove();
-      $('style').remove();
-      $('link').remove();
-      $('noscript').remove();
-      $('[data-skip-moving]').remove();
-      $('#bxdynamic_basketitems-component-block_start').remove();
-      $('#bxdynamic_basketitems-component-block_end').remove();
-      $('.cd-modal-bg').remove();
-      $('.burger-dropdown-menu').remove();
-      $('.mega_fixed_menu').remove();
-
-      // Собираем ссылки на подкатегории, исключая служебные элементы
+      // Получаем все ссылки на подкатегории
       const subcategoryLinks = new Set<string>();
-      $('a').each((_, el) => {
-        const href = $(el).attr('href');
+      $mainPage('a').each((_, el) => {
+        const href = $mainPage(el).attr('href');
         if (href && 
             href.includes(`/catalog/vkhodnye/${category}/`) && 
             !href.includes('?') && 
@@ -380,53 +361,21 @@ export class FarnitureService implements OnModuleInit {
       const uniqueSubcategoryLinks = Array.from(subcategoryLinks);
       this.logger.log(`Found ${uniqueSubcategoryLinks.length} unique subcategories in ${category}`);
 
-      // Парсим двери на текущей странице
-      await this.parseDoors($, category, doors);
+      // Парсим двери на главной странице категории
+      await this.parseAllPages(url, category, doors);
 
       // Очищаем память
-      $.root().empty();
-      html.length = 0;
+      $mainPage.root().empty();
       
-      // Парсим подкатегории
+      // Парсим каждую подкатегорию
       for (const subcategoryUrl of uniqueSubcategoryLinks) {
         try {
           this.logger.log(`Parsing subcategory: ${subcategoryUrl}`);
           await this.delay(10000);
           
-          const subcategoryResponse = await axios.get(`https://www.farniture.ru${subcategoryUrl}`, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5',
-            },
-            timeout: 30000,
-            maxContentLength: 10 * 1024 * 1024
-          });
+          const fullUrl = `https://www.farniture.ru${subcategoryUrl}`;
+          await this.parseAllPages(fullUrl, category, doors);
 
-          const subcategoryHtml = subcategoryResponse.data;
-          const $subcategory = cheerio.load(subcategoryHtml);
-
-          // Удаляем ненужные элементы
-          $subcategory('script').remove();
-          $subcategory('style').remove();
-          $subcategory('link').remove();
-          $subcategory('noscript').remove();
-          $subcategory('[data-skip-moving]').remove();
-          $subcategory('#bxdynamic_basketitems-component-block_start').remove();
-          $subcategory('#bxdynamic_basketitems-component-block_end').remove();
-          $subcategory('.cd-modal-bg').remove();
-          $subcategory('.burger-dropdown-menu').remove();
-          $subcategory('.mega_fixed_menu').remove();
-
-          await this.parseDoors($subcategory, category, doors);
-
-          // Очищаем память
-          $subcategory.root().empty();
-          subcategoryHtml.length = 0;
-
-          if (global.gc) {
-            global.gc();
-          }
         } catch (error) {
           this.logger.error(`Error parsing subcategory ${subcategoryUrl}: ${error.message}`);
           continue;
@@ -441,34 +390,109 @@ export class FarnitureService implements OnModuleInit {
     return doors;
   }
 
-  private async parseDoors($: cheerio.CheerioAPI, category: string, doors: IDoor[]): Promise<void> {
-    // Уменьшаем размер пакета для обработки
-    const batchSize = 5;
-    let doorCards = $('.catalog_item_wrapp.catalog_item.item_wrap');
-    
-    if (doorCards.length === 0) {
-      const alternativeSelectors = [
-        '.catalog_block .catalog_item',
-        '.product-item-container',
-        '.js-product-item',
-        '.item.product-item'
-      ];
-      
-      for (const selector of alternativeSelectors) {
-        const altCards = $(selector);
-        if (altCards.length > 0) {
-          doorCards = altCards as any;
-          break;
+  private async parseAllPages(baseUrl: string, category: string, doors: IDoor[]): Promise<void> {
+    let currentPage = 1;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      try {
+        const pageUrl = currentPage === 1 ? baseUrl : `${baseUrl}?PAGEN_1=${currentPage}`;
+        this.logger.log(`Parsing page ${currentPage} at ${pageUrl}`);
+        
+        const html = await this.fetchPage(pageUrl);
+        const $ = cheerio.load(html);
+
+        // Парсим двери на текущей странице
+        await this.parseDoors($, category, doors);
+
+        // Проверяем наличие следующей страницы
+        const nextPageLink = $('.module-pagination .nums .next').first();
+        hasNextPage = nextPageLink.length > 0;
+
+        // Очищаем память
+        $.root().empty();
+
+        if (hasNextPage) {
+          currentPage++;
+          // Увеличенная задержка между страницами
+          await this.delay(15000);
         }
+
+        if (global.gc) {
+          global.gc();
+        }
+      } catch (error) {
+        this.logger.error(`Error parsing page ${currentPage}: ${error.message}`);
+        break;
+      }
+    }
+  }
+
+  private async fetchPage(url: string): Promise<string> {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+      },
+      timeout: 30000,
+      maxContentLength: 10 * 1024 * 1024
+    });
+
+    const html = response.data;
+    const $ = cheerio.load(html);
+
+    // Удаляем ненужные элементы для экономии памяти
+    $('script').remove();
+    $('style').remove();
+    $('link').remove();
+    $('noscript').remove();
+    $('[data-skip-moving]').remove();
+    $('#bxdynamic_basketitems-component-block_start').remove();
+    $('#bxdynamic_basketitems-component-block_end').remove();
+    $('.cd-modal-bg').remove();
+    $('.burger-dropdown-menu').remove();
+    $('.mega_fixed_menu').remove();
+
+    return $.html();
+  }
+
+  private async parseDoors($: cheerio.CheerioAPI, category: string, doors: IDoor[]): Promise<void> {
+    // Расширяем список селекторов для поиска карточек дверей
+    const doorSelectors = [
+      '.catalog_item_wrapp.catalog_item.item_wrap',
+      '.catalog_block .catalog_item',
+      '.product-item-container',
+      '.js-product-item',
+      '.item.product-item',
+      '.catalog_block .item_block',
+      '.catalog_block .item',
+      '[data-entity="item"]'
+    ];
+
+    let doorCards;
+    for (const selector of doorSelectors) {
+      const cards = $(selector);
+      if (cards.length > 0) {
+        doorCards = cards;
+        break;
       }
     }
 
+    if (!doorCards || doorCards.length === 0) {
+      this.logger.warn('No door cards found on the page');
+      return;
+    }
+
     const doorCardsArray = doorCards.toArray();
+    const batchSize = 5;
     
     for (let i = 0; i < doorCardsArray.length; i += batchSize) {
       const batch = doorCardsArray.slice(i, i + batchSize);
       
-      // Увеличиваем интервал между пакетами
       if (i > 0) {
         await this.delay(5000);
       }
@@ -477,62 +501,96 @@ export class FarnitureService implements OnModuleInit {
         try {
           const $card = $(card);
           
-          const title = $card.find('.item-title a span').text().trim();
-          const priceText = $card.find('.price.font-bold.font_mxs').attr('data-value') || '';
-          const oldPriceText = $card.find('.price.discount').attr('data-value') || '';
-          
-          const imageUrls: string[] = [];
-          $card.find('.section-gallery-wrapper__item img.img-responsive').each((_, img) => {
-            const imgUrl = $(img).attr('data-src') || $(img).attr('src');
-            if (imgUrl && !imgUrl.includes('double_ring.svg')) {
-              const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
-              if (!imageUrls.includes(fullUrl)) {
-                imageUrls.push(fullUrl.replace(/";$/, '')); // Удаляем лишние символы в конце URL
-              }
-            }
-          });
+          // Расширяем селекторы для поиска заголовка
+          const titleSelectors = [
+            '.item-title a span',
+            '.item-title span',
+            '.product-item-title a',
+            '.product_title a',
+            'h4 a',
+            '[data-entity="title"] span'
+          ];
 
-          if (imageUrls.length === 0) {
-            const mainImage = $card.find('.image_wrapper_block img.img-responsive');
-            mainImage.each((_, img) => {
+          let title = '';
+          for (const selector of titleSelectors) {
+            title = $card.find(selector).text().trim();
+            if (title) break;
+          }
+
+          // Расширяем селекторы для поиска цены
+          const priceSelectors = [
+            '.price.font-bold.font_mxs',
+            '.price_value',
+            '.product-item-price-current',
+            '.price',
+            '[data-entity="price"]'
+          ];
+
+          let priceText = '';
+          for (const selector of priceSelectors) {
+            const priceElement = $card.find(selector);
+            priceText = priceElement.attr('data-value') || priceElement.text().trim();
+            if (priceText) break;
+          }
+
+          // Очищаем цену от нечисловых символов
+          priceText = priceText.replace(/[^\d]/g, '');
+
+          if (!title || !priceText) {
+            this.logger.warn(`Skipping door card - missing title or price`);
+            continue;
+          }
+
+          const imageUrls: string[] = [];
+          const imageSelectors = [
+            '.section-gallery-wrapper__item img.img-responsive',
+            '.image_wrapper_block img.img-responsive',
+            '.product-item-image-wrapper img',
+            '.image img',
+            '[data-entity="image"] img'
+          ];
+
+          for (const selector of imageSelectors) {
+            $card.find(selector).each((_, img) => {
               const imgUrl = $(img).attr('data-src') || $(img).attr('src');
               if (imgUrl && !imgUrl.includes('double_ring.svg')) {
                 const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
                 if (!imageUrls.includes(fullUrl)) {
-                  imageUrls.push(fullUrl.replace(/";$/, '')); // Удаляем лишние символы в конце URL
+                  imageUrls.push(fullUrl.replace(/";$/, ''));
                 }
               }
             });
+            if (imageUrls.length > 0) break;
           }
 
-          if (!title || !priceText) {
+          const productUrl = $card.find('a[href*="/catalog/"]').attr('href');
+          if (!productUrl) {
+            this.logger.warn(`Skipping door card - no product URL found`);
             continue;
           }
 
-          const productUrl = $card.find('.item-title a').attr('href');
-          const stockBlock = $card.find('.item-stock');
-          const inStock = stockBlock.length > 0 && stockBlock.find('.value').text().includes('Есть в наличии');
+          const stockBlock = $card.find('.item-stock, [data-entity="stock"]');
+          const inStock = stockBlock.length > 0 && 
+                         (stockBlock.find('.value').text().includes('Есть в наличии') || 
+                          stockBlock.text().includes('В наличии'));
 
           const door: IDoor = {
             title,
             price: parseInt(priceText) || 0,
-            oldPrice: oldPriceText ? parseInt(oldPriceText) : undefined,
-            category,
+            categoryId: await this.getCategoryId(category),
             imageUrls,
             inStock,
-            url: productUrl ? (productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`) : '',
-            features: [], // Инициализируем пустым массивом
-            installation: {}, // Инициализируем пустым объектом
+            url: productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`,
+            features: [],
+            installation: {}
           };
 
-          if (productUrl) {
-            try {
-              await this.delay(3000);
-              const details = await this.parseProductDetails(door.url);
-              Object.assign(door, details);
-            } catch (error) {
-              this.logger.warn(`Error parsing details for ${title}: ${error.message}`);
-            }
+          try {
+            await this.delay(3000);
+            const details = await this.parseProductDetails(door.url);
+            Object.assign(door, details);
+          } catch (error) {
+            this.logger.warn(`Error parsing details for ${title}: ${error.message}`);
           }
 
           doors.push(door);
@@ -543,11 +601,27 @@ export class FarnitureService implements OnModuleInit {
         }
       }
 
-      // Очищаем память после каждого пакета
       if (global.gc) {
         global.gc();
       }
     }
+  }
+
+  private async getCategoryId(categoryName: string): Promise<number> {
+    const category = await this.categoryRepository.findOne({
+      where: { name: categoryName }
+    });
+    
+    if (!category) {
+      // Если категория не найдена, создаем новую
+      const newCategory = await this.categoryRepository.save({
+        name: categoryName,
+        description: `Категория дверей ${categoryName}`
+      });
+      return newCategory.id;
+    }
+    
+    return category.id;
   }
 
   private async parseProductDetails(url: string): Promise<Partial<IDoor>> {
@@ -870,7 +944,7 @@ export class FarnitureService implements OnModuleInit {
             title: doorJson.title,
             price: doorJson.price,
             oldPrice: doorJson.oldPrice,
-            category: doorJson.category,
+            categoryId: doorJson.categoryId,
             imageUrls: doorJson.imageUrls || [],
             inStock: doorJson.inStock || false,
             description: doorJson.description || '',
@@ -879,7 +953,7 @@ export class FarnitureService implements OnModuleInit {
           };
 
           // Проверяем обязательные поля
-          if (!doorToSave.title || !doorToSave.price || !doorToSave.category || !doorToSave.url) {
+          if (!doorToSave.title || !doorToSave.price || !doorToSave.categoryId || !doorToSave.url) {
             this.logger.error(`[Redis Restore] Missing required fields for door ${externalId}`);
             errorCount++;
             continue;
@@ -936,20 +1010,39 @@ export class FarnitureService implements OnModuleInit {
 
   // Создание двери
   async createDoor(createDoorDto: CreateDoorDto): Promise<Door> {
-    const door = await this.doorRepository.save(createDoorDto);
-    await this.updateRedisCache(door);
-    return door;
+    try {
+      const newDoor = this.doorRepository.create({
+        ...createDoorDto,
+        categoryId: createDoorDto.categoryId
+      });
+      return await this.doorRepository.save(newDoor);
+    } catch (error) {
+      this.logger.error(`Error creating door: ${error.message}`);
+      throw error;
+    }
   }
 
   // Обновление двери
   async updateDoor(id: string, updateDoorDto: UpdateDoorDto): Promise<Door> {
-    await this.doorRepository.update(id, updateDoorDto);
-    const updatedDoor = await this.doorRepository.findOne({ where: { id } });
-    if (!updatedDoor) {
-      throw new Error(`Door with id ${id} not found`);
+    try {
+      const doorToUpdate = await this.doorRepository.findOne({
+        where: { id },
+      });
+
+      if (!doorToUpdate) {
+        throw new Error(`Door with id ${id} not found`);
+      }
+
+      const updatedDoor = this.doorRepository.merge(doorToUpdate, {
+        ...updateDoorDto,
+        categoryId: updateDoorDto.categoryId
+      });
+
+      return await this.doorRepository.save(updatedDoor);
+    } catch (error) {
+      this.logger.error(`Error updating door with id ${id}: ${error.message}`);
+      throw error;
     }
-    await this.updateRedisCache(updatedDoor);
-    return updatedDoor;
   }
 
   // Удаление двери

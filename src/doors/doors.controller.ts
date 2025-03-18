@@ -3,6 +3,7 @@ import { DoorsService } from './doors.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Door } from '../parsers/farniture/entities/door.entity';
 import { ErrorHandler } from '../utils/error-handler';
+import { FindAllFilters } from './interfaces/find-all-filters.interface';
 
 interface UpdatePricesDto {
   category?: string;
@@ -38,19 +39,15 @@ export class DoorsController {
   ) {
     this.logger.log(`Received request with query params: ${JSON.stringify({ page, limit, category, priceMin, priceMax, inStock, sort })}`);
     
-    const filters = {
-      category,
+    const filters: FindAllFilters = {
+      category: category,
       priceMin: priceMin ? Number(priceMin) : undefined,
       priceMax: priceMax ? Number(priceMax) : undefined,
       inStock: inStock === 'true' ? true : inStock === 'false' ? false : undefined,
       sort: sort || 'popular',
     };
 
-    return this.doorsService.findAll(
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-      filters
-    );
+    return this.doorsService.findAll(filters);
   }
 
   @Get('similar/:id')
