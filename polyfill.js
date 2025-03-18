@@ -32,22 +32,29 @@ try {
   const typeormUtilsPath = path.join(__dirname, 'node_modules', '@nestjs', 'typeorm', 'dist', 'common', 'typeorm.utils.js');
   
   if (fs.existsSync(typeormUtilsPath)) {
-    // Читаем содержимое файла
-    const content = fs.readFileSync(typeormUtilsPath, 'utf8');
-    
-    // Модифицируем файл только если он содержит оригинальную функцию
-    if (content.includes('const generateString = () => crypto.randomUUID();')) {
-      // Заменяем функцию generateString
-      const patchedContent = content.replace(
+    // Проверяем существование файла, не читая его содержимое - это предотвращает ошибки
+    // Вносим исправления, используя тот же подход, что и в Dockerfile
+    try {
+      fs.writeFileSync('/tmp/patch.js', 'function randomUUID() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0; var v = c == "x" ? r : (r & 0x3 | 0x8); return v.toString(16); }); }; const generateString = () => randomUUID();');
+      
+      // Читаем оригинальный файл
+      const originalContent = fs.readFileSync(typeormUtilsPath, 'utf8');
+      
+      // Заменяем строку
+      const patchedContent = originalContent.replace(
         'const generateString = () => crypto.randomUUID();',
         'function randomUUID() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0; var v = c == "x" ? r : (r & 0x3 | 0x8); return v.toString(16); }); }; const generateString = () => randomUUID();'
       );
       
-      // Записываем изменения
-      fs.writeFileSync(typeormUtilsPath, patchedContent);
-      console.log('Successfully patched @nestjs/typeorm module');
-    } else {
-      console.log('No need to patch @nestjs/typeorm (already patched or different version)');
+      // Если строка была изменена, записываем обратно
+      if (originalContent !== patchedContent) {
+        fs.writeFileSync(typeormUtilsPath, patchedContent);
+        console.log('Successfully patched @nestjs/typeorm module');
+      } else {
+        console.log('No need to patch @nestjs/typeorm (already patched or different version)');
+      }
+    } catch (err) {
+      console.error('Error during file patching:', err);
     }
   } else {
     console.log(`@nestjs/typeorm utils file not found at ${typeormUtilsPath}`);
