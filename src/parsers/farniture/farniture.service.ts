@@ -266,18 +266,26 @@ export class FarnitureService implements OnModuleInit {
           }
 
           // Подготавливаем данные для сохранения
-          const doorToSave = {
-            ...doorData,
+          const doorToSave: Partial<Door> = {
+            title: doorData.title,
+            price: doorData.price,
+            oldPrice: doorData.oldPrice,
+            categoryId: doorData.categoryId,
+            url: doorData.url,
             externalId,
             imageUrls: doorData.imageUrls || [],
+            thumbnailUrls: doorData.thumbnailUrls || [],
             inStock: doorData.inStock || false,
             description: doorData.description || '',
             specifications: doorData.specifications || {},
-            category: { id: doorData.categoryId }
+            manufacturer: doorData.manufacturer,
+            warranty: doorData.warranty,
+            country: doorData.country,
+            priceUnit: doorData.priceUnit
           };
 
           // Сохраняем в базу данных
-          const savedDoor = await this.doorRepository.save(doorToSave);
+          const savedDoor = await this.doorRepository.save(doorToSave as Door);
           
           if (!savedDoor || !savedDoor.id) {
             this.logger.error(`[Parser] Failed to save door ${doorData.title} to database`);
@@ -939,17 +947,22 @@ export class FarnitureService implements OnModuleInit {
           }
 
           // Создаем объект двери для сохранения в базу
-          const doorToSave = {
-            externalId,
+          const doorToSave: Partial<Door> = {
             title: doorJson.title,
             price: doorJson.price,
             oldPrice: doorJson.oldPrice,
             categoryId: doorJson.categoryId,
+            url: doorJson.url,
+            externalId,
             imageUrls: doorJson.imageUrls || [],
+            thumbnailUrls: doorJson.thumbnailUrls || [],
             inStock: doorJson.inStock || false,
             description: doorJson.description || '',
             specifications: doorJson.specifications || {},
-            url: doorJson.url
+            manufacturer: doorJson.manufacturer,
+            warranty: doorJson.warranty,
+            country: doorJson.country,
+            priceUnit: doorJson.priceUnit
           };
 
           // Проверяем обязательные поля
@@ -960,7 +973,7 @@ export class FarnitureService implements OnModuleInit {
           }
 
           // Сохраняем в базу данных
-          await this.doorRepository.save(doorToSave);
+          await this.doorRepository.save(doorToSave as Door);
           restoredCount++;
           
           if (restoredCount % 100 === 0) {
