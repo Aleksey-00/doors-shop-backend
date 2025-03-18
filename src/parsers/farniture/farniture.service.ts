@@ -281,7 +281,15 @@ export class FarnitureService implements OnModuleInit {
             manufacturer: doorData.manufacturer,
             warranty: doorData.warranty,
             country: doorData.country,
-            priceUnit: doorData.priceUnit
+            priceUnit: doorData.priceUnit,
+            installation: doorData.installation ? JSON.stringify(doorData.installation) : undefined,
+            dimensions: doorData.dimensions || undefined,
+            materials: doorData.materials || undefined,
+            equipment: doorData.equipment || undefined,
+            features: doorData.features || undefined,
+            sizes: doorData.sizes || undefined,
+            brand: doorData.brand?.name,
+            rating: doorData.rating?.value
           };
 
           // Сохраняем в базу данных
@@ -962,7 +970,15 @@ export class FarnitureService implements OnModuleInit {
             manufacturer: doorJson.manufacturer,
             warranty: doorJson.warranty,
             country: doorJson.country,
-            priceUnit: doorJson.priceUnit
+            priceUnit: doorJson.priceUnit,
+            installation: doorJson.installation ? JSON.stringify(doorJson.installation) : undefined,
+            dimensions: doorJson.dimensions || undefined,
+            materials: doorJson.materials || undefined,
+            equipment: doorJson.equipment || undefined,
+            features: doorJson.features || undefined,
+            sizes: doorJson.sizes || undefined,
+            brand: doorJson.brand?.name,
+            rating: doorJson.rating?.value
           };
 
           // Проверяем обязательные поля
