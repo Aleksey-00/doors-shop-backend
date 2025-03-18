@@ -1,48 +1,45 @@
-import { Controller, Post, Body, Get, Put, Param, UseGuards } from '@nestjs/common';
-import { RequestsService, MeasurementRequest, CallbackRequest } from './requests.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Controller, Get, Post, Body, Patch, Param } from '@nestjs/common';
+import { RequestsService } from './requests.service';
+import { MeasurementRequest } from './entities/measurement-request.entity';
+import { CallbackRequest } from './entities/callback-request.entity';
 
 @Controller('requests')
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
   @Post('measurement')
-  async createMeasurementRequest(@Body() data: Omit<MeasurementRequest, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
+  createMeasurementRequest(@Body() data: Omit<MeasurementRequest, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
     return this.requestsService.createMeasurementRequest(data);
   }
 
   @Post('callback')
-  async createCallbackRequest(@Body() data: Omit<CallbackRequest, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
+  createCallbackRequest(@Body() data: Omit<CallbackRequest, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
     return this.requestsService.createCallbackRequest(data);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('measurement')
-  async getMeasurementRequests() {
+  getMeasurementRequests() {
     return this.requestsService.getMeasurementRequests();
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('callback')
-  async getCallbackRequests() {
+  getCallbackRequests() {
     return this.requestsService.getCallbackRequests();
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Put('measurement/:id/status')
-  async updateMeasurementRequestStatus(
+  @Patch('measurement/:id/status')
+  updateMeasurementRequestStatus(
     @Param('id') id: string,
-    @Body('status') status: string
+    @Body('status') status: 'pending' | 'completed' | 'cancelled'
   ) {
-    return this.requestsService.updateMeasurementRequestStatus(parseInt(id), status);
+    return this.requestsService.updateMeasurementRequestStatus(id, status);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Put('callback/:id/status')
-  async updateCallbackRequestStatus(
+  @Patch('callback/:id/status')
+  updateCallbackRequestStatus(
     @Param('id') id: string,
-    @Body('status') status: string
+    @Body('status') status: 'pending' | 'completed' | 'cancelled'
   ) {
-    return this.requestsService.updateCallbackRequestStatus(parseInt(id), status);
+    return this.requestsService.updateCallbackRequestStatus(id, status);
   }
 } 
