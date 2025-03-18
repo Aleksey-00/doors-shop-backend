@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ParsersModule } from './parsers/parsers.module';
 import { CategoriesModule } from './categories/categories.module';
 import './polyfills';
+import { RequestsModule } from './requests/requests.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import './polyfills';
     UsersModule,
     ParsersModule,
     CategoriesModule,
+    RequestsModule,
   ],
 })
 export class AppModule {} 

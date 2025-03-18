@@ -130,7 +130,7 @@ export class FarnitureService implements OnModuleInit {
           await this.restoreFromRedis();
         } else if (dbCount === 0) {
           this.logger.log('[Daily] No doors found, starting parser');
-          await this.parseAndSaveDoors();
+        await this.parseAndSaveDoors();
         } else {
           this.logger.log(`[Daily] Skipping parsing - found ${dbCount} doors in database`);
         }
@@ -156,7 +156,7 @@ export class FarnitureService implements OnModuleInit {
       if (this.redisEnabled && this.redisService['client']) {
         try {
           redisCount = (await this.redisService['client'].keys('door:*')).length;
-        } catch (error) {
+    } catch (error) {
           this.logger.error(`[Parser] Error accessing Redis: ${error.message}`);
         }
       }
@@ -219,7 +219,7 @@ export class FarnitureService implements OnModuleInit {
         }
       }
       
-      return { 
+      return {
         totalDoors: totalParsedDoors,
         savedDoors: totalSavedDoors,
         savedInDb: await this.doorRepository.count(),
@@ -382,7 +382,7 @@ export class FarnitureService implements OnModuleInit {
 
       // Очищаем память
       $mainPage.root().empty();
-      
+
       // Парсим каждую подкатегорию
       for (const subcategoryUrl of uniqueSubcategoryLinks) {
         try {
@@ -514,9 +514,9 @@ export class FarnitureService implements OnModuleInit {
       }
       
       for (const card of batch) {
-        try {
-          const $card = $(card);
-          
+      try {
+        const $card = $(card);
+        
           // Расширяем селекторы для поиска заголовка
           const titleSelectors = [
             '.item-title a span',
@@ -568,10 +568,10 @@ export class FarnitureService implements OnModuleInit {
 
           for (const selector of imageSelectors) {
             $card.find(selector).each((_, img) => {
-              const imgUrl = $(img).attr('data-src') || $(img).attr('src');
-              if (imgUrl && !imgUrl.includes('double_ring.svg')) {
-                const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
-                if (!imageUrls.includes(fullUrl)) {
+            const imgUrl = $(img).attr('data-src') || $(img).attr('src');
+            if (imgUrl && !imgUrl.includes('double_ring.svg')) {
+              const fullUrl = imgUrl.startsWith('http') ? imgUrl : `https://www.farniture.ru${imgUrl}`;
+              if (!imageUrls.includes(fullUrl)) {
                   imageUrls.push(fullUrl.replace(/";$/, ''));
                 }
               }
@@ -582,24 +582,24 @@ export class FarnitureService implements OnModuleInit {
           const productUrl = $card.find('a[href*="/catalog/"]').attr('href');
           if (!productUrl) {
             this.logger.warn(`Skipping door card - no product URL found`);
-            continue;
-          }
+          continue;
+        }
 
           const stockBlock = $card.find('.item-stock, [data-entity="stock"]');
           const inStock = stockBlock.length > 0 && 
                          (stockBlock.find('.value').text().includes('Есть в наличии') || 
                           stockBlock.text().includes('В наличии'));
 
-          const door: IDoor = {
-            title,
-            price: parseInt(priceText) || 0,
+        const door: IDoor = {
+          title,
+          price: parseInt(priceText) || 0,
             categoryId: await this.getCategoryId(category),
-            imageUrls,
-            inStock,
+          imageUrls,
+          inStock,
             url: productUrl.startsWith('http') ? productUrl : `https://www.farniture.ru${productUrl}`,
             features: [],
             installation: {}
-          };
+        };
 
           try {
             await this.delay(3000);
@@ -607,15 +607,15 @@ export class FarnitureService implements OnModuleInit {
             Object.assign(door, details);
           } catch (error) {
             this.logger.warn(`Error parsing details for ${title}: ${error.message}`);
-          }
-
-          doors.push(door);
-          this.logger.debug(`Successfully parsed door: ${title}`);
-        } catch (error) {
-          this.logger.error(`Error parsing door card: ${error.message}`);
-          continue;
         }
+
+        doors.push(door);
+        this.logger.debug(`Successfully parsed door: ${title}`);
+      } catch (error) {
+        this.logger.error(`Error parsing door card: ${error.message}`);
+        continue;
       }
+    }
 
       if (global.gc) {
         global.gc();
@@ -649,7 +649,7 @@ export class FarnitureService implements OnModuleInit {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
       });
-
+      
       const html = response.data;
       
       // Проверяем, что ответ не является HTML-страницей с ошибкой
