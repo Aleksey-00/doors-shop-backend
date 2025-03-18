@@ -6,6 +6,9 @@ export class MeasurementRequest {
   id: string;
 
   @Column()
+  doorId: string;
+
+  @Column()
   name: string;
 
   @Column()

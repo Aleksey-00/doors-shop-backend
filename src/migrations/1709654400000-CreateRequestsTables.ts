@@ -11,6 +11,10 @@ export class CreateRequestsTables1709654400000 implements MigrationInterface {
                     isPrimary: true,
                 },
                 {
+                    name: "door_id",
+                    type: "uuid",
+                },
+                {
                     name: "name",
                     type: "varchar",
                 },
