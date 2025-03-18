@@ -47,13 +47,13 @@ ENV REDIS_URL=redis://default:mtUQxXvFcfAWLxbmhGiSomzsNvPCpiBl@centerbeam.proxy.
 # Создаем скрипт для запуска приложения с миграциями, заполнением данных и синхронизацией Redis
 RUN printf '#!/bin/sh\n\
 echo "Running migrations..."\n\
-npm run migration:run\n\
+node -r ./polyfill.js node_modules/ts-node/dist/bin.js ./node_modules/typeorm/cli.js migration:run -d ./typeorm.config.ts\n\
 echo "Seeding database..."\n\
-node dist/src/scripts/run-seed-prod.js\n\
+node -r ./polyfill.js dist/src/scripts/run-seed-prod.js\n\
 echo "Synchronizing Redis..."\n\
-npm run sync:redis\n\
+node -r ./polyfill.js node_modules/ts-node/dist/bin.js src/scripts/sync-redis.ts\n\
 echo "Starting application..."\n\
-node dist/src/main.js\n' > /app/start.sh
+node -r ./polyfill.js dist/src/main.js\n' > /app/start.sh
 
 # Делаем скрипт исполняемым
 RUN chmod +x /app/start.sh
