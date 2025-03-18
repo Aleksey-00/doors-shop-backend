@@ -12,19 +12,7 @@ async function bootstrap() {
   
   // Настройка CORS для разрешения запросов с фронтенда
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://moos-doors.ru',
-      'https://www.moos-doors.ru',
-      'http://moos-doors.ru',
-      'http://www.moos-doors.ru',
-      'https://doors-shop-frontend-production.up.railway.app',
-      'http://doors-shop-frontend-production.up.railway.app',
-      'https://doors-shop-backend-production.up.railway.app',
-      'http://doors-shop-backend-production.up.railway.app',
-      'null',
-      '*'
-    ],
+    origin: true, // Разрешаем все origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
@@ -47,7 +35,8 @@ async function bootstrap() {
       'X-Forwarded-For',
       'Connection',
       'Pragma',
-      'Cache-Control'
+      'Cache-Control',
+      'User-Agent'
     ],
     exposedHeaders: ['Content-Disposition', 'X-RateLimit-Reset'],
     maxAge: 3600,
