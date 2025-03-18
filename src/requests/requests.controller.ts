@@ -3,7 +3,7 @@ import { RequestsService } from './requests.service';
 import { MeasurementRequest } from './entities/measurement-request.entity';
 import { CallbackRequest } from './entities/callback-request.entity';
 
-@Controller('api')
+@Controller()
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
