@@ -11,6 +11,7 @@ import { UpdateUserPasswords1710587682123 } from './src/migrations/UpdateUserPas
 import { AddNewDoorFields1710510000000 } from './src/migrations/1710510000000-AddNewDoorFields';
 import { AddViewsColumnToDoors1710700000001 } from './src/migrations/1710700000001-AddViewsColumnToDoors';
 import { FixDoorsPrice1710700000002 } from './src/migrations/1710700000002-FixDoorsPrice';
+import { FixPriceUnit1710700000003 } from './src/migrations/1710700000003-FixPriceUnit';
 
 config(); // Загружаем переменные окружения
 
@@ -29,7 +30,8 @@ const dataSource = new DataSource({
     UpdateUserPasswords1710587682123,  // Обновляет пароли пользователей
     AddNewDoorFields1710510000000,      // Добавляет новые поля для дверей
     AddViewsColumnToDoors1710700000001, // Добавляет колонку views для дверей
-    FixDoorsPrice1710700000002         // Исправляет цену дверей
+    FixDoorsPrice1710700000002,        // Исправляет цену дверей
+    FixPriceUnit1710700000003          // Исправляет единицу цены
   ],
   migrationsRun: true,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,

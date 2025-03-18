@@ -11,30 +11,26 @@ export class FixDoorsPrice1710700000002 implements MigrationInterface {
         // Копируем данные из старой колонки в новую
         await queryRunner.query(`
             UPDATE doors 
-            SET price_new = price::decimal(10,2)
+            SET price_new = price
         `);
 
-        // Обновляем триггер для использования новой колонки
+        // Обновляем функцию триггера
         await queryRunner.query(`
             CREATE OR REPLACE FUNCTION update_category()
             RETURNS TRIGGER AS $$
             BEGIN
-                IF NEW.price_new <= 50000 THEN
-                    NEW.category_id := 1; -- Эконом
-                ELSIF NEW.price_new <= 100000 THEN
-                    NEW.category_id := 2; -- Стандарт
+                IF NEW.price <= 50000 THEN
+                    NEW.category = 'Эконом';
+                ELSIF NEW.price <= 100000 THEN
+                    NEW.category = 'Стандарт';
+                ELSIF NEW.price <= 150000 THEN
+                    NEW.category = 'Премиум';
                 ELSE
-                    NEW.category_id := 3; -- Премиум
+                    NEW.category = 'Люкс';
                 END IF;
                 RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
-
-            DROP TRIGGER IF EXISTS update_category_trigger ON doors;
-            CREATE TRIGGER update_category_trigger
-            BEFORE INSERT OR UPDATE ON doors
-            FOR EACH ROW
-            EXECUTE FUNCTION update_category();
         `);
 
         // Удаляем старую колонку
@@ -48,42 +44,28 @@ export class FixDoorsPrice1710700000002 implements MigrationInterface {
             ALTER TABLE doors 
             RENAME COLUMN price_new TO price
         `);
+
+        // Пересоздаем триггер
+        await queryRunner.query(`
+            DROP TRIGGER IF EXISTS update_category_trigger ON doors;
+            CREATE TRIGGER update_category_trigger
+            BEFORE INSERT OR UPDATE ON doors
+            FOR EACH ROW
+            EXECUTE FUNCTION update_category();
+        `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Создаем временную колонку
+        // Создаем временную колонку для отката
         await queryRunner.query(`
             ALTER TABLE doors 
-            ADD COLUMN price_old decimal(10,2)
+            ADD COLUMN price_old numeric
         `);
 
         // Копируем данные обратно
         await queryRunner.query(`
             UPDATE doors 
             SET price_old = price
-        `);
-
-        // Возвращаем старый триггер
-        await queryRunner.query(`
-            CREATE OR REPLACE FUNCTION update_category()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                IF NEW.price_old <= 50000 THEN
-                    NEW.category_id := 1; -- Эконом
-                ELSIF NEW.price_old <= 100000 THEN
-                    NEW.category_id := 2; -- Стандарт
-                ELSE
-                    NEW.category_id := 3; -- Премиум
-                END IF;
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-
-            DROP TRIGGER IF EXISTS update_category_trigger ON doors;
-            CREATE TRIGGER update_category_trigger
-            BEFORE INSERT OR UPDATE ON doors
-            FOR EACH ROW
-            EXECUTE FUNCTION update_category();
         `);
 
         // Удаляем новую колонку
@@ -96,6 +78,34 @@ export class FixDoorsPrice1710700000002 implements MigrationInterface {
         await queryRunner.query(`
             ALTER TABLE doors 
             RENAME COLUMN price_old TO price
+        `);
+
+        // Восстанавливаем старую функцию триггера
+        await queryRunner.query(`
+            CREATE OR REPLACE FUNCTION update_category()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF NEW.price <= 50000 THEN
+                    NEW.category = 'Эконом';
+                ELSIF NEW.price <= 100000 THEN
+                    NEW.category = 'Стандарт';
+                ELSIF NEW.price <= 150000 THEN
+                    NEW.category = 'Премиум';
+                ELSE
+                    NEW.category = 'Люкс';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        `);
+
+        // Пересоздаем триггер
+        await queryRunner.query(`
+            DROP TRIGGER IF EXISTS update_category_trigger ON doors;
+            CREATE TRIGGER update_category_trigger
+            BEFORE INSERT OR UPDATE ON doors
+            FOR EACH ROW
+            EXECUTE FUNCTION update_category();
         `);
     }
 } 
