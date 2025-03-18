@@ -9,8 +9,8 @@ console.log('Loading polyfill.js...');
 function safeGenerateUUID() {
   // Чистый JavaScript без зависимостей от crypto
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0, 
-          v = c == 'x' ? r : (r & 0x3 | 0x8);
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
@@ -33,40 +33,34 @@ try {
   const typeormUtilsPath = path.join(__dirname, 'node_modules', '@nestjs', 'typeorm', 'dist', 'common', 'typeorm.utils.js');
   
   if (fs.existsSync(typeormUtilsPath)) {
+    const replacement = `const generateString = () => { 
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) { 
+    const r = Math.random() * 16 | 0; 
+    const v = c == "x" ? r : (r & 0x3 | 0x8); 
+    return v.toString(16); 
+  }); 
+};`;
+
     let content = fs.readFileSync(typeormUtilsPath, 'utf8');
     
-    // Заменяем вызов crypto.randomUUID() на безопасную реализацию
     if (content.includes('crypto.randomUUID()')) {
-      content = content.replace(
-        'const generateString = () => crypto.randomUUID();',
-        `const generateString = () => {
-          // Чистый JavaScript без зависимостей от crypto
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0, 
-                  v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-          });
-        };`
-      );
-      
+      content = content.replace('const generateString = () => crypto.randomUUID();', replacement);
       fs.writeFileSync(typeormUtilsPath, content, 'utf8');
       console.log('Successfully patched @nestjs/typeorm module');
     } else if (content.includes('crypto.randomBytes')) {
-      // Если предыдущий патч уже применен, но использует crypto.randomBytes
-      content = content.replace(
-        /const generateString = \(\) => \{ try \{ return crypto\.randomUUID\(\); \} catch \(e\) \{ const rb = crypto\.randomBytes\(16\);[^}]*\} \};/g,
-        `const generateString = () => {
-          // Чистый JavaScript без зависимостей от crypto
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0, 
-                  v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-          });
-        };`
-      );
-      
-      fs.writeFileSync(typeormUtilsPath, content, 'utf8');
-      console.log('Successfully patched @nestjs/typeorm module (replaced existing patch)');
+      // Пробуем найти и заменить предыдущий патч с регулярным выражением
+      try {
+        const regex = /const generateString = \(\) =>[\s\S]*?return v\.toString\(16\);[\s\S]*?\};/g;
+        if (regex.test(content)) {
+          content = content.replace(regex, replacement);
+          fs.writeFileSync(typeormUtilsPath, content, 'utf8');
+          console.log('Successfully replaced previous patch in @nestjs/typeorm module');
+        } else {
+          console.log('Could not find pattern to replace in @nestjs/typeorm module');
+        }
+      } catch (regexError) {
+        console.error('Error with regex replacement:', regexError);
+      }
     } else {
       console.log('No need to patch @nestjs/typeorm (pattern not found)');
     }

@@ -15,7 +15,8 @@ COPY . .
 RUN ls -la
 
 # Патчим @nestjs/typeorm для обхода проблемы с crypto.randomUUID()
-RUN sed -i 's/const generateString = () => crypto.randomUUID();/const generateString = () => { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(\/[xy]\/g, function(c) { const r = Math.random() * 16 | 0, v = c == "x" ? r : (r & 0x3 | 0x8); return v.toString(16); }); };/' /app/node_modules/@nestjs/typeorm/dist/common/typeorm.utils.js
+RUN echo 'const generateString = () => { return \"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx\".replace(/[xy]/g, function(c) { const r = Math.random() * 16 | 0; const v = c == \"x\" ? r : (r & 0x3 | 0x8); return v.toString(16); }); };' > /tmp/replacement.js && \
+    sed -i "s/const generateString = () => crypto.randomUUID();/$(sed 's:/:\\/:g' /tmp/replacement.js)/" /app/node_modules/@nestjs/typeorm/dist/common/typeorm.utils.js
 
 # Собираем приложение
 RUN npm run build
