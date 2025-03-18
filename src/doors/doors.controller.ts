@@ -45,6 +45,8 @@ export class DoorsController {
       priceMax: priceMax ? Number(priceMax) : undefined,
       inStock: inStock === 'true' ? true : inStock === 'false' ? false : undefined,
       sort: sort || 'popular',
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 12,
     };
 
     return this.doorsService.findAll(filters);

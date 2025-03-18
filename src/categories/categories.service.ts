@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { Category } from './entities/category.entity';
 
 @Injectable()
@@ -11,15 +11,13 @@ export class CategoriesService {
   ) {}
 
   async findAll(): Promise<Category[]> {
-    // Фильтруем категории, оставляя только "премиум", "стандарт" и "эконом"
-    const allowedCategories = ['премиум', 'стандарт', 'эконом'];
+    // Фильтруем категории, оставляя только "Премиум", "Стандарт" и "Эконом"
+    const allowedCategories = ['Премиум', 'Стандарт', 'Эконом'];
     
     return this.categoryRepository.find({
-      where: [
-        { name: allowedCategories[0] },
-        { name: allowedCategories[1] },
-        { name: allowedCategories[2] }
-      ],
+      where: allowedCategories.map(category => ({ 
+        name: ILike(category)
+      })),
       order: {
         name: 'ASC'
       }

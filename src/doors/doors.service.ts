@@ -14,6 +14,8 @@ interface FindAllFilters {
   priceMax?: number;
   inStock?: boolean;
   sort?: 'popular' | 'price_asc' | 'price_desc' | 'new';
+  page?: number;
+  limit?: number;
 }
 
 @Injectable()
@@ -42,7 +44,7 @@ export class DoorsService {
       });
   }
 
-  async findAll(filters: FindAllFilters = {}): Promise<Door[]> {
+  async findAll(filters: FindAllFilters = {}): Promise<{ doors: Door[], totalPages: number, currentPage: number, totalDoors: number }> {
     this.logger.log(`Finding doors with filters: ${JSON.stringify(filters)}`);
     
     const queryBuilder = this.doorRepository.createQueryBuilder('door')
@@ -82,9 +84,30 @@ export class DoorsService {
     }
 
     try {
+      // Получаем общее количество дверей
+      const totalDoors = await queryBuilder.getCount();
+      
+      // Устанавливаем значения по умолчанию для пагинации
+      const page = filters.page || 1;
+      const limit = filters.limit || 12;
+      
+      // Вычисляем общее количество страниц
+      const totalPages = Math.ceil(totalDoors / limit);
+      
+      // Добавляем пагинацию
+      queryBuilder.skip((page - 1) * limit).take(limit);
+      
+      // Получаем двери для текущей страницы
       const doors = await queryBuilder.getMany();
-      this.logger.log(`Found ${doors.length} doors`);
-      return doors;
+      
+      this.logger.log(`Found ${doors.length} doors on page ${page} of ${totalPages}`);
+      
+      return {
+        doors,
+        totalPages,
+        currentPage: page,
+        totalDoors
+      };
     } catch (error) {
       this.logger.error(`Error finding doors: ${error.message}`);
       throw error;
