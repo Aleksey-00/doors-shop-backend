@@ -82,7 +82,7 @@ export class DoorsService {
           'door.views',
           'door.createdAt',
           'door.externalId',
-          'category.name as category_name'
+          'door.category_name'
         ])
         .where('1=1');
 
@@ -210,7 +210,7 @@ export class DoorsService {
           'door.views',
           'door.createdAt',
           'door.externalId',
-          'category.name as category_name'
+          'door.category_name'
         ])
         .where('door.id = :id', { id })
         .getRawOne();
@@ -312,7 +312,7 @@ export class DoorsService {
         'door.views',
         'door.createdAt',
         'door.externalId',
-        'category.name as category_name'
+        'door.category_name'
       ])
       .where('door.id != :id', { id })
       .andWhere('door.categoryId = :categoryId', { categoryId: door.categoryId })
