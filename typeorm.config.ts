@@ -12,6 +12,7 @@ import { AddNewDoorFields1710510000000 } from './src/migrations/1710510000000-Ad
 import { AddViewsColumnToDoors1710700000001 } from './src/migrations/1710700000001-AddViewsColumnToDoors';
 import { FixDoorsPrice1710700000002 } from './src/migrations/1710700000002-FixDoorsPrice';
 import { FixPriceUnit1710700000003 } from './src/migrations/1710700000003-FixPriceUnit';
+import { UpdateDoorCategory1710700000000 } from './src/migrations/1710700000000-UpdateDoorCategory';
 
 config(); // Загружаем переменные окружения
 
@@ -31,7 +32,8 @@ const dataSource = new DataSource({
     AddNewDoorFields1710510000000,      // Добавляет новые поля для дверей
     AddViewsColumnToDoors1710700000001, // Добавляет колонку views для дверей
     FixDoorsPrice1710700000002,        // Исправляет цену дверей
-    FixPriceUnit1710700000003          // Исправляет единицу цены
+    FixPriceUnit1710700000003,         // Исправляет единицу цены
+    UpdateDoorCategory1710700000000     // Обновляет структуру категорий дверей
   ],
   migrationsRun: true,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
