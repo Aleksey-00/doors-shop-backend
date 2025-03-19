@@ -25,6 +25,9 @@ export class Door {
   @Column({ name: 'category_id' })
   categoryId: number;
 
+  @Column({ name: 'category_name' })
+  category_name: string;
+
   @Column('text', { array: true, default: '{}', name: 'image_urls' })
   imageUrls: string[];
 

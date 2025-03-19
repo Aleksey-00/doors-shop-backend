@@ -144,19 +144,13 @@ export class DoorsService {
       queryBuilder.skip((page - 1) * limit).take(limit);
 
       // Получаем двери с пагинацией
-      const doors = await queryBuilder.getRawMany();
-
-      // Преобразуем результат в нужный формат
-      const doorsWithCategoryName = doors.map(door => ({
-        ...door,
-        category_name: door.category_name || ''
-      }));
+      const doors = await queryBuilder.getMany();
 
       // Вычисляем общее количество страниц
       const totalPages = Math.ceil(totalDoors / limit);
 
       return {
-        doors: doorsWithCategoryName,
+        doors,
         totalPages,
         currentPage: page,
         totalDoors,
@@ -188,7 +182,6 @@ export class DoorsService {
     try {
       const door = await this.doorRepository
         .createQueryBuilder('door')
-        .leftJoin('door.category', 'category')
         .select([
           'door.id',
           'door.title',
@@ -213,7 +206,7 @@ export class DoorsService {
           'door.category_name'
         ])
         .where('door.id = :id', { id })
-        .getRawOne();
+        .getOne();
       
       if (!door) {
         this.logger.warn(`Door with id ${id} not found in database`);
@@ -320,7 +313,7 @@ export class DoorsService {
       .orderBy('RANDOM()')
       .take(4);
 
-    const similarDoors = await queryBuilder.getRawMany();
+    const similarDoors = await queryBuilder.getMany();
     
     // Добавляем category_name к каждой двери
     const similarDoorsWithCategoryName = similarDoors.map(door => ({
