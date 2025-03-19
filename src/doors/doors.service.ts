@@ -88,10 +88,7 @@ export class DoorsService {
 
       // Фильтр по категории
       if (category) {
-        const categoryId = parseInt(category);
-        if (!isNaN(categoryId) && categoryId >= 1 && categoryId <= 3) {
-          queryBuilder.andWhere('door.categoryId = :categoryId', { categoryId });
-        }
+        queryBuilder.andWhere('door.category_name = :category', { category });
       }
 
       // Фильтр по поиску
@@ -359,7 +356,7 @@ export class DoorsService {
   async updateTitlesInCategory(category: string, searchText: string, replaceText: string) {
     try {
       const doors = await this.doorRepository.find({
-        where: { categoryId: await this.getCategoryId(category) },
+        where: { category_name: category },
       });
 
       this.logger.log(`Found ${doors.length} doors in category "${category}" for title update`);
@@ -411,7 +408,7 @@ export class DoorsService {
       const queryBuilder = this.doorRepository.createQueryBuilder('door');
 
       if (category) {
-        queryBuilder.where('door.categoryId = :categoryId', { categoryId: await this.getCategoryId(category) });
+        queryBuilder.where('door.category_name = :category', { category });
       }
 
       // Получаем только ID дверей для пакетной обработки
@@ -461,17 +458,5 @@ export class DoorsService {
       this.logger.error(error.stack);
       return { success: false, message: `Ошибка при обновлении цен: ${error.message}` };
     }
-  }
-
-  private async getCategoryId(categoryName: string): Promise<number> {
-    const category = await this.categoryRepository.findOne({
-      where: { name: categoryName }
-    });
-    
-    if (!category) {
-      throw new NotFoundException(`Category ${categoryName} not found`);
-    }
-    
-    return category.id;
   }
 } 
