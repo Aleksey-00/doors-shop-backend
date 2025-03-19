@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Res, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Response } from 'express';
-import axios from 'axios';
+import fetch from 'node-fetch';
 
 @Controller('api/proxy-image')
 export class ProxyImageController {
@@ -17,46 +17,71 @@ export class ProxyImageController {
 
     try {
       this.logger.log(`Fetching image from: ${url}`);
-      const response = await axios.get(url, {
-        responseType: 'arraybuffer',
+      const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.farniture.ru/'
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Referer': 'https://www.farniture.ru/',
+          'Origin': 'https://www.farniture.ru',
+          'Connection': 'keep-alive',
+          'Sec-Fetch-Dest': 'image',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'same-origin',
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache',
+          'DNT': '1',
+          'Upgrade-Insecure-Requests': '1'
         },
-        timeout: 10000, // 10 second timeout
-        validateStatus: (status) => status === 200 // Only accept 200 status
+        timeout: 10000,
+        redirect: 'follow',
+        follow: 5,
+        compress: true,
+        agent: new (require('https').Agent)({
+          rejectUnauthorized: false,
+          keepAlive: true,
+          timeout: 10000
+        })
       });
 
-      this.logger.log(`Successfully fetched image. Content-Type: ${response.headers['content-type']}`);
+      if (!response.ok) {
+        this.logger.error(`Error response: ${response.status} ${response.statusText}`);
+        this.logger.error(`Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+        throw new HttpException(
+          `Failed to proxy image: ${response.statusText}`,
+          response.status
+        );
+      }
+
+      const contentType = response.headers.get('content-type');
+      const contentLength = response.headers.get('content-length');
+      this.logger.log(`Successfully fetched image. Content-Type: ${contentType}, Size: ${contentLength} bytes`);
       
-      res.setHeader('Content-Type', response.headers['content-type']);
+      // Set CORS headers
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+      
+      // Set content headers
+      res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000');
-      res.send(response.data);
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength);
+      }
+      
+      // Get the image buffer and send it
+      const buffer = await response.buffer();
+      res.send(buffer);
     } catch (error) {
       this.logger.error(`Error proxying image: ${error.message}`);
       
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          // The request was made and the server responded with a status code
-          // that falls out of the range of 2xx
-          this.logger.error(`Error response: ${error.response.status} ${error.response.statusText}`);
-          throw new HttpException(
-            `Failed to proxy image: ${error.response.statusText}`,
-            error.response.status
-          );
-        } else if (error.request) {
-          // The request was made but no response was received
-          this.logger.error('No response received from server');
-          throw new HttpException('No response received from server', HttpStatus.GATEWAY_TIMEOUT);
-        } else {
-          // Something happened in setting up the request that triggered an Error
-          this.logger.error(`Error setting up request: ${error.message}`);
-          throw new HttpException('Failed to set up request', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+      if (error.name === 'AbortError') {
+        this.logger.error('Request timeout');
+        throw new HttpException('Request timeout', HttpStatus.GATEWAY_TIMEOUT);
+      } else if (error instanceof HttpException) {
+        throw error;
       } else {
-        // Something else happened
         this.logger.error(`Unexpected error: ${error.message}`);
         throw new HttpException('Unexpected error occurred', HttpStatus.INTERNAL_SERVER_ERROR);
       }
