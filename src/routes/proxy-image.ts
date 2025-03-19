@@ -2,7 +2,7 @@ import { Controller, Get, Query, Res, HttpException, HttpStatus } from '@nestjs/
 import { Response } from 'express';
 import axios from 'axios';
 
-@Controller('proxy-image')
+@Controller('api/proxy-image')
 export class ProxyImageController {
   @Get()
   async proxyImage(@Query('url') url: string, @Res() res: Response) {
