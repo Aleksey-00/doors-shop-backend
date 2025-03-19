@@ -60,7 +60,30 @@ export class DoorsService {
 
       const queryBuilder = this.doorRepository
         .createQueryBuilder('door')
-        .leftJoinAndSelect('door.category', 'category')
+        .leftJoin('door.category', 'category')
+        .select([
+          'door.id',
+          'door.title',
+          'door.price',
+          'door.oldPrice',
+          'door.imageUrls',
+          'door.inStock',
+          'door.updatedAt',
+          'door.description',
+          'door.specifications',
+          'door.dimensions',
+          'door.materials',
+          'door.equipment',
+          'door.features',
+          'door.manufacturer',
+          'door.warranty',
+          'door.installation',
+          'door.categoryId',
+          'door.views',
+          'door.createdAt',
+          'door.externalId',
+          'category.name as category_name'
+        ])
         .where('1=1');
 
       // Фильтр по категории
@@ -121,13 +144,19 @@ export class DoorsService {
       queryBuilder.skip((page - 1) * limit).take(limit);
 
       // Получаем двери с пагинацией
-      const doors = await queryBuilder.getMany();
+      const doors = await queryBuilder.getRawMany();
+
+      // Преобразуем результат в нужный формат
+      const doorsWithCategoryName = doors.map(door => ({
+        ...door,
+        category_name: door.category_name || ''
+      }));
 
       // Вычисляем общее количество страниц
       const totalPages = Math.ceil(totalDoors / limit);
 
       return {
-        doors,
+        doors: doorsWithCategoryName,
         totalPages,
         currentPage: page,
         totalDoors,
@@ -157,10 +186,34 @@ export class DoorsService {
 
     this.logger.log(`No cached door found, querying database for id: ${id}`);
     try {
-      const door = await this.doorRepository.findOne({
-        where: { id },
-        relations: ['category']
-      });
+      const door = await this.doorRepository
+        .createQueryBuilder('door')
+        .leftJoin('door.category', 'category')
+        .select([
+          'door.id',
+          'door.title',
+          'door.price',
+          'door.oldPrice',
+          'door.imageUrls',
+          'door.inStock',
+          'door.updatedAt',
+          'door.description',
+          'door.specifications',
+          'door.dimensions',
+          'door.materials',
+          'door.equipment',
+          'door.features',
+          'door.manufacturer',
+          'door.warranty',
+          'door.installation',
+          'door.categoryId',
+          'door.views',
+          'door.createdAt',
+          'door.externalId',
+          'category.name as category_name'
+        ])
+        .where('door.id = :id', { id })
+        .getRawOne();
       
       if (!door) {
         this.logger.warn(`Door with id ${id} not found in database`);
@@ -169,16 +222,22 @@ export class DoorsService {
 
       this.logger.log(`Found door in database: ${JSON.stringify(door)}`);
 
+      // Добавляем category_name к двери
+      const doorWithCategoryName = {
+        ...door,
+        category_name: door.category_name || ''
+      };
+
       // Увеличиваем счетчик просмотров асинхронно, не ждем завершения
       this.incrementViews(id).catch(err => 
         this.logger.error(`Error incrementing views for door ${id}: ${err.message}`)
       );
 
       // Cache the result
-      await this.redisService.set(cacheKey, JSON.stringify(door));
+      await this.redisService.set(cacheKey, JSON.stringify(doorWithCategoryName));
       this.logger.log(`Cached door with id: ${id}`);
 
-      return door;
+      return doorWithCategoryName;
     } catch (error) {
       this.logger.error(`Error finding door with id ${id}: ${error.message}`);
       this.logger.error(error.stack);
@@ -231,19 +290,49 @@ export class DoorsService {
     const maxPrice = door.price * 1.2;
 
     const queryBuilder = this.doorRepository.createQueryBuilder('door')
+      .leftJoin('door.category', 'category')
+      .select([
+        'door.id',
+        'door.title',
+        'door.price',
+        'door.oldPrice',
+        'door.imageUrls',
+        'door.inStock',
+        'door.updatedAt',
+        'door.description',
+        'door.specifications',
+        'door.dimensions',
+        'door.materials',
+        'door.equipment',
+        'door.features',
+        'door.manufacturer',
+        'door.warranty',
+        'door.installation',
+        'door.categoryId',
+        'door.views',
+        'door.createdAt',
+        'door.externalId',
+        'category.name as category_name'
+      ])
       .where('door.id != :id', { id })
       .andWhere('door.categoryId = :categoryId', { categoryId: door.categoryId })
       .andWhere('door.price BETWEEN :minPrice AND :maxPrice', { minPrice, maxPrice })
       .orderBy('RANDOM()')
       .take(4);
 
-    const similarDoors = await queryBuilder.getMany();
+    const similarDoors = await queryBuilder.getRawMany();
+    
+    // Добавляем category_name к каждой двери
+    const similarDoorsWithCategoryName = similarDoors.map(door => ({
+      ...door,
+      category_name: door.category_name || ''
+    }));
     
     // Cache the result
-    await this.redisService.set(cacheKey, JSON.stringify(similarDoors));
+    await this.redisService.set(cacheKey, JSON.stringify(similarDoorsWithCategoryName));
     this.logger.log(`Cached similar doors for id: ${id}`);
 
-    return similarDoors;
+    return similarDoorsWithCategoryName;
   }
 
   private async invalidateCache(): Promise<void> {
