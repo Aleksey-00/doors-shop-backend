@@ -10,7 +10,7 @@ import { ParsersModule } from './parsers/parsers.module';
 import { CategoriesModule } from './categories/categories.module';
 import './polyfills';
 import { RequestsModule } from './requests/requests.module';
-import { ProxyImageController } from './routes/proxy-image';
+import { ProxyImageModule } from './routes/proxy-image.module';
 
 @Module({
   imports: [
@@ -106,9 +106,7 @@ import { ProxyImageController } from './routes/proxy-image';
     ParsersModule,
     CategoriesModule,
     RequestsModule,
-  ],
-  controllers: [
-    ProxyImageController,
+    ProxyImageModule,
   ],
 })
 export class AppModule {} 
