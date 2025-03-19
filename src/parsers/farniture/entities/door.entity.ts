@@ -25,7 +25,7 @@ export class Door {
   @Column({ name: 'category_id' })
   categoryId: number;
 
-  @Column({ name: 'category_name' })
+  @Column({ name: 'category_name', nullable: true, select: false })
   category_name: string;
 
   @Column('text', { array: true, default: '{}', name: 'image_urls' })
