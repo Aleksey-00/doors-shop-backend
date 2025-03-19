@@ -36,8 +36,9 @@ export class DoorsController {
     @Query('priceMax') priceMax?: string,
     @Query('inStock') inStock?: string,
     @Query('sort') sort?: 'popular' | 'price_asc' | 'price_desc' | 'new',
+    @Query('search') search?: string,
   ) {
-    this.logger.log(`Received request with query params: ${JSON.stringify({ page, limit, category, priceMin, priceMax, inStock, sort })}`);
+    this.logger.log(`Received request with query params: ${JSON.stringify({ page, limit, category, priceMin, priceMax, inStock, sort, search })}`);
     
     const filters: FindAllFilters = {
       category: category,
@@ -47,6 +48,7 @@ export class DoorsController {
       sort: sort || 'popular',
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 12,
+      search: search
     };
 
     return this.doorsService.findAll(filters);

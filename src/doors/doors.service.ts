@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import { Door } from '../parsers/farniture/entities/door.entity';
 import { RedisService } from '../redis/redis.service';
 import { In } from 'typeorm';
@@ -93,10 +93,7 @@ export class DoorsService {
 
       // Фильтр по поиску
       if (search) {
-        queryBuilder.andWhere(
-          '(LOWER(door.title) LIKE LOWER(:search) OR LOWER(door.description) LIKE LOWER(:search))',
-          { search: `%${search}%` },
-        );
+        queryBuilder.andWhere('LOWER(door.title) LIKE LOWER(:search)', { search: `%${search}%` });
       }
 
       // Фильтр по цене
@@ -153,7 +150,7 @@ export class DoorsService {
         totalDoors,
       };
     } catch (error) {
-      console.error('Error in findAll:', error);
+      this.logger.error('Error in findAll:', error);
       throw new Error('Failed to fetch doors');
     }
   }
