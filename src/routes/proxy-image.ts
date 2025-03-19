@@ -2,7 +2,7 @@ import { Controller, Get, Query, Res, HttpException, HttpStatus, Logger } from '
 import { Response } from 'express';
 import fetch from 'node-fetch';
 
-@Controller('api/proxy-image')
+@Controller('proxy-image')
 export class ProxyImageController {
   private readonly logger = new Logger(ProxyImageController.name);
 
