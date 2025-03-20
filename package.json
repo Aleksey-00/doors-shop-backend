@@ -26,7 +26,8 @@
     "sync:redis": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/sync-redis.ts",
     "clear:redis": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/clear-redis.ts",
     "seed": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/run-seed.ts",
-    "parse:doors": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/parse-doors.ts"
+    "parse:doors": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/parse-doors.ts",
+    "check:db": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/check-database.ts"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.2",
