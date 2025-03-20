@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
-import { Door } from '../parsers/farniture/entities/door.entity';
+import { Door } from '../doors/entities/door.entity';
 import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RedisService } from '../redis/redis.service';
