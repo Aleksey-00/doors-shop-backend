@@ -18,7 +18,7 @@ import { Category } from './categories/entities/category.entity';
 import { Order } from './orders/entities/order.entity';
 import { validate } from './config/env.validation';
 import * as path from 'path';
-import { DefaultNamingStrategy } from 'typeorm';
+import { CustomNamingStrategy } from './config/naming-strategy';
 
 @Module({
   imports: [
@@ -39,7 +39,7 @@ import { DefaultNamingStrategy } from 'typeorm';
         entities: [User, Door, Category, Order],
         synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',
         logging: configService.get('TYPEORM_LOGGING') === 'true',
-        namingStrategy: new DefaultNamingStrategy(),
+        namingStrategy: new CustomNamingStrategy(),
       }),
       inject: [ConfigService],
     }),

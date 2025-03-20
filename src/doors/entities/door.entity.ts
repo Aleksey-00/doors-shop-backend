@@ -14,10 +14,10 @@ export class Door {
   @Column({ type: 'integer' })
   price: number;
 
-  @Column({ type: 'integer', nullable: true, name: 'old_price' })
+  @Column({ type: 'integer', nullable: true })
   oldPrice: number;
 
-  @Column({ type: 'varchar', nullable: true, name: 'image_url' })
+  @Column({ type: 'varchar', nullable: true })
   imageUrl: string;
 
   @Column({ type: 'jsonb', nullable: true })
@@ -26,18 +26,18 @@ export class Door {
   @Column({ nullable: true })
   category: string;
 
-  @Column({ name: 'in_stock' })
+  @Column()
   inStock: boolean;
 
   @Column()
   url: string;
 
-  @Column({ unique: true, name: 'external_id' })
+  @Column({ unique: true })
   externalId: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn()
   updatedAt: Date;
 } 
