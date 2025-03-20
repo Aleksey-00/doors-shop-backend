@@ -1,74 +1,75 @@
-import { plainToInstance, Transform } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { IsBoolean, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
 
 class EnvironmentVariables {
   @IsNumber()
-  @Transform(({ value }) => Number(value || '8080'))
   PORT: number;
 
   @IsString()
-  @Transform(({ value }) => value || '')
   DB_HOST: string;
 
   @IsNumber()
-  @Transform(({ value }) => Number(value || '5432'))
   DB_PORT: number;
 
   @IsString()
-  @Transform(({ value }) => value || '')
   DB_USERNAME: string;
 
   @IsString()
-  @Transform(({ value }) => value || '')
   DB_PASSWORD: string;
 
   @IsString()
-  @Transform(({ value }) => value || '')
   DB_NAME: string;
 
   @IsString()
-  @Transform(({ value }) => value || 'production')
   NODE_ENV: string;
 
   @IsString()
-  @Transform(({ value }) => value || '')
   JWT_SECRET: string;
 
   @IsString()
-  @Transform(({ value }) => value || '24h')
   JWT_EXPIRATION_TIME: string;
 
   @IsNumber()
-  @Transform(({ value }) => Number(value || '100'))
   RATE_LIMIT_MAX: number;
 
   @IsNumber()
-  @Transform(({ value }) => Number(value || '900000'))
   RATE_LIMIT_WINDOW_MS: number;
 
   @IsBoolean()
-  @Transform(({ value }) => value === 'true' || value === true || value === '1')
   TYPEORM_LOGGING: boolean;
 
   @IsBoolean()
-  @Transform(({ value }) => value === 'true' || value === true || value === '1')
   TYPEORM_SYNCHRONIZE: boolean;
 
   @IsBoolean()
-  @Transform(({ value }) => value === 'true' || value === true || value === '1')
   REDIS_ENABLED: boolean;
 
   @IsString()
   @IsOptional()
-  @Transform(({ value }) => value || '')
   REDIS_URL?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
-    enableImplicitConversion: true,
-    excludeExtraneousValues: true,
-  });
+  // Преобразуем значения перед валидацией
+  const transformedConfig = {
+    PORT: Number(config.PORT || '8080'),
+    DB_HOST: String(config.DB_HOST || ''),
+    DB_PORT: Number(config.DB_PORT || '5432'),
+    DB_USERNAME: String(config.DB_USERNAME || ''),
+    DB_PASSWORD: String(config.DB_PASSWORD || ''),
+    DB_NAME: String(config.DB_NAME || ''),
+    NODE_ENV: String(config.NODE_ENV || 'production'),
+    JWT_SECRET: String(config.JWT_SECRET || ''),
+    JWT_EXPIRATION_TIME: String(config.JWT_EXPIRATION_TIME || '24h'),
+    RATE_LIMIT_MAX: Number(config.RATE_LIMIT_MAX || '100'),
+    RATE_LIMIT_WINDOW_MS: Number(config.RATE_LIMIT_WINDOW_MS || '900000'),
+    TYPEORM_LOGGING: config.TYPEORM_LOGGING === 'true' || config.TYPEORM_LOGGING === true || config.TYPEORM_LOGGING === '1',
+    TYPEORM_SYNCHRONIZE: config.TYPEORM_SYNCHRONIZE === 'true' || config.TYPEORM_SYNCHRONIZE === true || config.TYPEORM_SYNCHRONIZE === '1',
+    REDIS_ENABLED: config.REDIS_ENABLED === 'true' || config.REDIS_ENABLED === true || config.REDIS_ENABLED === '1',
+    REDIS_URL: config.REDIS_URL ? String(config.REDIS_URL) : undefined,
+  };
+
+  const validatedConfig = plainToInstance(EnvironmentVariables, transformedConfig);
   
   const errors = validateSync(validatedConfig, {
     skipMissingProperties: false,
