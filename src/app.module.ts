@@ -17,12 +17,14 @@ import { Door } from './doors/entities/door.entity';
 import { Category } from './categories/entities/category.entity';
 import { Order } from './orders/entities/order.entity';
 import { validate } from './config/env.validation';
+import * as path from 'path';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
+      envFilePath: path.resolve(process.cwd(), '.env'),
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
