@@ -1,8 +1,14 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { RedisService } from './redis.service';
 
 @Module({
-  providers: [RedisService],
+  providers: [
+    RedisService,
+    {
+      provide: Logger,
+      useValue: new Logger(RedisModule.name),
+    },
+  ],
   exports: [RedisService],
 })
 export class RedisModule {} 

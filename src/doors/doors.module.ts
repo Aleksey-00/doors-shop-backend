@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
 import { DoorsController } from './doors.controller';
@@ -10,13 +10,19 @@ import { Category } from '../categories/entities/category.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Door, Category]),
+    TypeOrmModule.forFeature([Door]),
     PassportModule,
     AuthModule,
     RedisModule,
   ],
   controllers: [DoorsController],
-  providers: [DoorsService],
-  exports: [TypeOrmModule, DoorsService],
+  providers: [
+    DoorsService,
+    {
+      provide: Logger,
+      useValue: new Logger(DoorsModule.name),
+    },
+  ],
+  exports: [DoorsService],
 })
 export class DoorsModule {} 

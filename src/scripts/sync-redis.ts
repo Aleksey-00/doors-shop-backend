@@ -68,7 +68,7 @@ async function bootstrap() {
 
     // Проверяем подключение к Redis
     try {
-      await redisService['client'].ping();
+      await redisService.ping();
       logger.log('Successfully connected to Redis');
     } catch (error) {
       logger.error('Failed to connect to Redis:', error.message);

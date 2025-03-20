@@ -4,8 +4,8 @@ import { DataSource } from 'typeorm';
 import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  const logger = new Logger('DatabaseCheck');
-  logger.log('Starting database check...');
+  const logger = new Logger('DatabaseInit');
+  logger.log('Starting database initialization...');
 
   try {
     const app = await NestFactory.createApplicationContext(AppModule);
@@ -71,10 +71,10 @@ async function bootstrap() {
       logger.log('Table recreated successfully');
     }
 
-    logger.log('Database check completed successfully');
+    logger.log('Database initialization completed successfully');
     await app.close();
   } catch (error) {
-    logger.error('Error during database check:', error);
+    logger.error('Error during database initialization:', error);
     process.exit(1);
   }
 }

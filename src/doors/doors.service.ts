@@ -336,6 +336,7 @@ export class DoorsService {
 
   async create(door: Partial<Door>): Promise<Door> {
     try {
+      this.logger.log('Creating new door...');
       const newDoor = this.doorRepository.create(door);
       const savedDoor = await this.doorRepository.save(newDoor);
       
@@ -344,7 +345,7 @@ export class DoorsService {
       this.logger.log(`Successfully created door with ID ${savedDoor.id}`);
       return savedDoor;
     } catch (error) {
-      this.logger.error(`Error in create: ${error.message}`);
+      this.logger.error('Error creating door:', error);
       this.logger.error(error.stack);
       throw error;
     }

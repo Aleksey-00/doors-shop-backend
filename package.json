@@ -8,10 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "node -r ./polyfill.js dist/main",
-    "start:dev": "node -r ./polyfill.js --exec nest start --watch",
-    "start:debug": "node -r ./polyfill.js --exec nest start --debug --watch",
-    "start:prod": "node -r ./polyfill.js dist/main",
+    "start": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/init-database.ts && node -r ./polyfill.js dist/main",
+    "start:dev": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/init-database.ts && node -r ./polyfill.js --exec nest start --watch",
+    "start:debug": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/init-database.ts && node -r ./polyfill.js --exec nest start --debug --watch",
+    "start:prod": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/init-database.ts && node -r ./polyfill.js dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -27,7 +27,8 @@
     "clear:redis": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/clear-redis.ts",
     "seed": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/run-seed.ts",
     "parse:doors": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/parse-doors.ts",
-    "check:db": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/check-database.ts"
+    "check:db": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/check-database.ts",
+    "init:db": "node -r ./polyfill.js ./node_modules/ts-node/dist/bin.js src/scripts/init-database.ts"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.2",
