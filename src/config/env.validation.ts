@@ -13,7 +13,7 @@ class EnvironmentVariables {
   @IsString()
   @Transform(({ value }) => {
     console.log('DB_HOST transform:', value);
-    return String(value);
+    return value;
   })
   DB_HOST: string;
 
@@ -28,48 +28,48 @@ class EnvironmentVariables {
   @IsString()
   @Transform(({ value }) => {
     console.log('DB_USERNAME transform:', value);
-    return String(value);
+    return value;
   })
   DB_USERNAME: string;
 
   @IsString()
   @Transform(({ value }) => {
     console.log('DB_PASSWORD transform:', value);
-    return String(value);
+    return value;
   })
   DB_PASSWORD: string;
 
   @IsString()
   @Transform(({ value }) => {
     console.log('DB_NAME transform:', value);
-    return String(value);
+    return value;
   })
   DB_NAME: string;
 
   @IsString()
   @Transform(({ value }) => {
     console.log('NODE_ENV transform:', value);
-    return String(value);
+    return value;
   })
   NODE_ENV: string;
 
   @IsString()
   @Transform(({ value }) => {
     console.log('JWT_SECRET transform:', value);
-    return String(value);
+    return value;
   })
   JWT_SECRET: string;
 
   @IsString()
   @Transform(({ value }) => {
     console.log('JWT_EXPIRATION_TIME transform:', value);
-    return String(value);
+    return value;
   })
   JWT_EXPIRATION_TIME: string;
 
   @IsNumber()
   @Transform(({ value }) => {
-    const num = Number(value);
+    const num = Number(value || '100');
     console.log('RATE_LIMIT_MAX transform:', value, '->', num);
     return num;
   })
@@ -77,7 +77,7 @@ class EnvironmentVariables {
 
   @IsNumber()
   @Transform(({ value }) => {
-    const num = Number(value);
+    const num = Number(value || '900000');
     console.log('RATE_LIMIT_WINDOW_MS transform:', value, '->', num);
     return num;
   })
@@ -111,7 +111,7 @@ class EnvironmentVariables {
   @IsOptional()
   @Transform(({ value }) => {
     console.log('REDIS_URL transform:', value);
-    return value ? String(value) : undefined;
+    return value;
   })
   REDIS_URL?: string;
 }

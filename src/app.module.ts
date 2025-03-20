@@ -24,7 +24,7 @@ import * as path from 'path';
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
-      envFilePath: path.resolve(process.cwd(), '.env'),
+      ignoreEnvFile: true,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -36,8 +36,8 @@ import * as path from 'path';
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
         entities: [User, Door, Category, Order],
-        synchronize: configService.get('TYPEORM_SYNCHRONIZE'),
-        logging: configService.get('TYPEORM_LOGGING'),
+        synchronize: configService.get('TYPEORM_SYNCHRONIZE') === 'true',
+        logging: configService.get('TYPEORM_LOGGING') === 'true',
       }),
       inject: [ConfigService],
     }),
