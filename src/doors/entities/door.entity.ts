@@ -2,29 +2,26 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateCol
 
 @Entity('doors')
 export class Door {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column()
-  name: string;
+  title: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'integer' })
   price: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ type: 'integer', nullable: true })
   oldPrice: number;
 
-  @Column('simple-array')
-  images: string[];
+  @Column({ type: 'varchar', nullable: true })
+  imageUrl: string;
 
-  @Column({ type: 'jsonb' })
-  characteristics: Record<string, string>;
-
-  @Column({ nullable: true })
-  manufacturer: string;
+  @Column({ type: 'jsonb', nullable: true })
+  specifications: Record<string, string>;
 
   @Column({ nullable: true })
   category: string;
@@ -33,14 +30,14 @@ export class Door {
   inStock: boolean;
 
   @Column()
-  sourceUrl: string;
+  url: string;
+
+  @Column({ unique: true })
+  externalId: string;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @Column({ default: true })
-  isActive: boolean;
 } 
