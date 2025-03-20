@@ -49,14 +49,16 @@ ENV RAILWAY_ENVIRONMENT=true
 ENV REDIS_ENABLED=true
 ENV REDIS_URL=redis://default:mtUQxXvFcfAWLxbmhGiSomzsNvPCpiBl@centerbeam.proxy.rlwy.net:34577
 
-# Создаем скрипт для запуска приложения с миграциями, заполнением данных и синхронизацией Redis
+# Создаем скрипт для запуска приложения с миграциями, заполнением данных, синхронизацией Redis и запуском парсеров
 RUN printf '#!/bin/sh\n\
 echo "Running migrations..."\n\
 node -r ./polyfill.js node_modules/ts-node/dist/bin.js ./node_modules/typeorm/cli.js migration:run -d ./typeorm.config.ts\n\
 echo "Seeding database..."\n\
-node -r ./polyfill.js dist/src/scripts/run-seed-prod.js\n\
+node -r ./polyfill.js dist/src/scripts/run-seed.js\n\
 echo "Synchronizing Redis..."\n\
 node -r ./polyfill.js node_modules/ts-node/dist/bin.js src/scripts/sync-redis.ts\n\
+echo "Starting parsers..."\n\
+node -r ./polyfill.js node_modules/ts-node/dist/bin.js src/scripts/parse-doors.ts\n\
 echo "Starting application..."\n\
 node -r ./polyfill.js dist/src/main.js\n' > /app/start.sh
 
