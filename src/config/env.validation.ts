@@ -50,9 +50,22 @@ class EnvironmentVariables {
 }
 
 export function validate(config: Record<string, unknown>) {
-  const validatedConfig = plainToClass(EnvironmentVariables, config, {
+  // Преобразуем строковые значения в соответствующие типы
+  const transformedConfig = {
+    ...config,
+    PORT: parseInt(config.PORT as string, 10),
+    DB_PORT: parseInt(config.DB_PORT as string, 10),
+    RATE_LIMIT_MAX: parseInt(config.RATE_LIMIT_MAX as string, 10),
+    RATE_LIMIT_WINDOW_MS: parseInt(config.RATE_LIMIT_WINDOW_MS as string, 10),
+    TYPEORM_LOGGING: config.TYPEORM_LOGGING === 'true',
+    TYPEORM_SYNCHRONIZE: config.TYPEORM_SYNCHRONIZE === 'true',
+    REDIS_ENABLED: config.REDIS_ENABLED === 'true',
+  };
+
+  const validatedConfig = plainToClass(EnvironmentVariables, transformedConfig, {
     enableImplicitConversion: true,
   });
+  
   const errors = validateSync(validatedConfig, {
     skipMissingProperties: false,
   });
