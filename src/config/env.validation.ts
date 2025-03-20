@@ -1,14 +1,16 @@
-import { plainToClass } from 'class-transformer';
+import { plainToInstance, Transform } from 'class-transformer';
 import { IsBoolean, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
 
 class EnvironmentVariables {
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   PORT: number;
 
   @IsString()
   DB_HOST: string;
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   DB_PORT: number;
 
   @IsString()
@@ -30,18 +32,23 @@ class EnvironmentVariables {
   JWT_EXPIRATION_TIME: string;
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   RATE_LIMIT_MAX: number;
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   RATE_LIMIT_WINDOW_MS: number;
 
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   TYPEORM_LOGGING: boolean;
 
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   TYPEORM_SYNCHRONIZE: boolean;
 
   @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   REDIS_ENABLED: boolean;
 
   @IsString()
@@ -50,19 +57,7 @@ class EnvironmentVariables {
 }
 
 export function validate(config: Record<string, unknown>) {
-  // Преобразуем строковые значения в соответствующие типы
-  const transformedConfig = {
-    ...config,
-    PORT: parseInt(config.PORT as string, 10),
-    DB_PORT: parseInt(config.DB_PORT as string, 10),
-    RATE_LIMIT_MAX: parseInt(config.RATE_LIMIT_MAX as string, 10),
-    RATE_LIMIT_WINDOW_MS: parseInt(config.RATE_LIMIT_WINDOW_MS as string, 10),
-    TYPEORM_LOGGING: config.TYPEORM_LOGGING === 'true',
-    TYPEORM_SYNCHRONIZE: config.TYPEORM_SYNCHRONIZE === 'true',
-    REDIS_ENABLED: config.REDIS_ENABLED === 'true',
-  };
-
-  const validatedConfig = plainToClass(EnvironmentVariables, transformedConfig, {
+  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
   });
   
