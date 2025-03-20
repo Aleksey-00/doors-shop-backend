@@ -3,14 +3,14 @@ import { IsBoolean, IsNumber, IsOptional, IsString, validateSync } from 'class-v
 
 class EnvironmentVariables {
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number(value))
   PORT: number;
 
   @IsString()
   DB_HOST: string;
 
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number(value))
   DB_PORT: number;
 
   @IsString()
@@ -32,23 +32,23 @@ class EnvironmentVariables {
   JWT_EXPIRATION_TIME: string;
 
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number(value))
   RATE_LIMIT_MAX: number;
 
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number(value))
   RATE_LIMIT_WINDOW_MS: number;
 
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
   TYPEORM_LOGGING: boolean;
 
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
   TYPEORM_SYNCHRONIZE: boolean;
 
   @IsBoolean()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
   REDIS_ENABLED: boolean;
 
   @IsString()
@@ -59,10 +59,12 @@ class EnvironmentVariables {
 export function validate(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
+    excludeExtraneousValues: true,
   });
   
   const errors = validateSync(validatedConfig, {
     skipMissingProperties: false,
+    whitelist: true,
   });
 
   if (errors.length > 0) {
