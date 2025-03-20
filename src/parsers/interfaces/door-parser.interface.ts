@@ -1,14 +1,14 @@
 export interface DoorData {
-  name: string;
+  title: string;
   description?: string;
   price: number;
   oldPrice?: number;
-  images: string[];
-  characteristics: Record<string, string>;
-  manufacturer?: string;
+  imageUrl: string;
+  specifications: Record<string, string>;
   category?: string;
   inStock: boolean;
-  sourceUrl: string;
+  url: string;
+  externalId: string;
 }
 
 export interface IDoorParser {

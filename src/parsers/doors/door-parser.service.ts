@@ -52,7 +52,7 @@ export class DoorParserService {
     try {
       // Проверяем, существует ли уже дверь с таким URL
       const existingDoor = await this.doorRepository.findOne({
-        where: { sourceUrl: url }
+        where: { url }
       });
 
       if (existingDoor) {
@@ -69,20 +69,19 @@ export class DoorParserService {
       const doorData = await parser.parseDoorPage(url);
 
       // Скачиваем и сохраняем изображения
-      const savedImages = await Promise.all(
-        doorData.images.map(imageUrl => this.imageService.downloadAndSaveImage(imageUrl))
-      );
+      const savedImageUrl = await this.imageService.downloadAndSaveImage(doorData.imageUrl);
 
       // Создаем новую дверь
       const door = this.doorRepository.create({
         ...doorData,
-        images: savedImages,
+        imageUrl: savedImageUrl,
+        url,
       });
 
       // Сохраняем дверь в базу данных
       await this.doorRepository.save(door);
 
-      this.logger.log(`Успешно спарсена и сохранена дверь: ${door.name}`);
+      this.logger.log(`Успешно спарсена и сохранена дверь: ${door.title}`);
     } catch (error) {
       this.logger.error(`Ошибка при парсинге двери ${url}:`, error);
       throw error;

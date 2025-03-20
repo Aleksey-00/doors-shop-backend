@@ -14,7 +14,7 @@ export class FirstSiteParser implements IDoorParser {
       const $ = cheerio.load(response.data);
 
       // Название двери
-      const name = $('.h1').text().trim();
+      const title = $('.h1').text().trim();
 
       // Цены
       const priceText = $('.price-current strong').text().trim();
@@ -23,25 +23,21 @@ export class FirstSiteParser implements IDoorParser {
       // Описание
       const description = $('.param-body.param_text p').text().trim();
 
-      // Изображения
-      const images = $('.product-image .slick-slide img')
-        .map((_, el) => $(el).attr('src'))
-        .get()
-        .filter(src => src)
-        .map(src => src.startsWith('http') ? src : `${this.baseUrl}${src}`);
+      // Изображение
+      const imageUrl = $('.product-image .slick-slide img')
+        .first()
+        .attr('src') || '';
+      const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${this.baseUrl}${imageUrl}`;
 
       // Характеристики
-      const characteristics: Record<string, string> = {};
+      const specifications: Record<string, string> = {};
       $('.shop2-product-params tr').each((_, row) => {
         const key = $(row).find('th').text().trim();
         const value = $(row).find('td').text().trim();
         if (key && value) {
-          characteristics[key] = value;
+          specifications[key] = value;
         }
       });
-
-      // Производитель
-      const manufacturer = $('.product-options .option-body a').first().text().trim();
 
       // Категория
       const category = $('.widget-type-path a').last().text().trim();
@@ -49,17 +45,20 @@ export class FirstSiteParser implements IDoorParser {
       // Наличие
       const inStock = $('.product-options .option-body').last().text().trim().toLowerCase() === 'да';
 
+      // Внешний ID (используем URL как ID)
+      const externalId = url.split('/').pop() || url;
+
       return {
-        name,
+        title,
         description,
         price,
         oldPrice: undefined, // На сайте нет старой цены
-        images,
-        characteristics,
-        manufacturer,
+        imageUrl: fullImageUrl,
+        specifications,
         category,
         inStock,
-        sourceUrl: url,
+        url,
+        externalId,
       };
     } catch (error) {
       console.error(`Ошибка при парсинге страницы ${url}:`, error);

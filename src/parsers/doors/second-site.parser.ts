@@ -14,7 +14,7 @@ export class SecondSiteParser implements IDoorParser {
       const $ = cheerio.load(response.data);
 
       // Название двери
-      const name = $('h1').text().trim();
+      const title = $('h1').text().trim();
 
       // Цены
       const priceText = $('.product-price__current').text().trim();
@@ -26,25 +26,19 @@ export class SecondSiteParser implements IDoorParser {
       // Описание
       const description = $('.product-description').text().trim();
 
-      // Изображения
-      const images = $('.product-gallery__main img, .product-gallery__thumbs img')
-        .map((_, el) => $(el).attr('src'))
-        .get()
-        .filter(src => src)
-        .map(src => src.startsWith('http') ? src : `${this.baseUrl}${src}`);
+      // Изображение
+      const imageUrl = $('.product-gallery__main img').first().attr('src') || '';
+      const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${this.baseUrl}${imageUrl}`;
 
       // Характеристики
-      const characteristics: Record<string, string> = {};
+      const specifications: Record<string, string> = {};
       $('.product-specifications tr').each((_, row) => {
         const key = $(row).find('th').text().trim();
         const value = $(row).find('td').text().trim();
         if (key && value) {
-          characteristics[key] = value;
+          specifications[key] = value;
         }
       });
-
-      // Производитель
-      const manufacturer = $('.product-manufacturer').text().trim();
 
       // Категория
       const category = $('.breadcrumbs .category').last().text().trim();
@@ -52,17 +46,20 @@ export class SecondSiteParser implements IDoorParser {
       // Наличие
       const inStock = !$('.stock-status').text().toLowerCase().includes('нет в наличии');
 
+      // Внешний ID (используем URL как ID)
+      const externalId = url.split('/').pop() || url;
+
       return {
-        name,
+        title,
         description,
         price,
         oldPrice,
-        images,
-        characteristics,
-        manufacturer,
+        imageUrl: fullImageUrl,
+        specifications,
         category,
         inStock,
-        sourceUrl: url,
+        url,
+        externalId,
       };
     } catch (error) {
       console.error(`Ошибка при парсинге страницы ${url}:`, error);
