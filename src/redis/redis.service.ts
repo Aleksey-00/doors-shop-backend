@@ -44,10 +44,14 @@ export class RedisService {
     }
   }
 
-  async set(key: string, value: string): Promise<void> {
+  async set(key: string, value: string, ttl?: number): Promise<void> {
     try {
       this.logger.debug(`Setting key: ${key}`);
-      await this.client.set(key, value);
+      if (ttl) {
+        await this.client.set(key, value, 'EX', ttl);
+      } else {
+        await this.client.set(key, value);
+      }
       this.logger.debug(`Set value for key ${key}`);
     } catch (error) {
       this.logger.error(`Error setting key ${key}:`, error);
@@ -55,13 +59,17 @@ export class RedisService {
     }
   }
 
-  async del(key: string): Promise<void> {
+  async del(key: string | string[]): Promise<void> {
     try {
-      this.logger.debug(`Deleting key: ${key}`);
-      await this.client.del(key);
-      this.logger.debug(`Deleted key ${key}`);
+      this.logger.debug(`Deleting key(s): ${Array.isArray(key) ? key.join(', ') : key}`);
+      if (Array.isArray(key)) {
+        await this.client.del(...key);
+      } else {
+        await this.client.del(key);
+      }
+      this.logger.debug(`Deleted key(s) ${Array.isArray(key) ? key.join(', ') : key}`);
     } catch (error) {
-      this.logger.error(`Error deleting key ${key}:`, error);
+      this.logger.error(`Error deleting key(s) ${Array.isArray(key) ? key.join(', ') : key}:`, error);
       throw error;
     }
   }
