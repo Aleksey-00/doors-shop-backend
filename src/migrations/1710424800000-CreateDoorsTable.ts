@@ -22,7 +22,7 @@ export class CreateDoorsTable1710424800000 implements MigrationInterface {
             type: 'integer',
           },
           {
-            name: 'oldPrice',
+            name: 'old_price',
             type: 'integer',
             isNullable: true,
           },
@@ -31,12 +31,12 @@ export class CreateDoorsTable1710424800000 implements MigrationInterface {
             type: 'varchar',
           },
           {
-            name: 'imageUrl',
+            name: 'image_url',
             type: 'varchar',
             isNullable: true,
           },
           {
-            name: 'inStock',
+            name: 'in_stock',
             type: 'boolean',
           },
           {
@@ -54,17 +54,17 @@ export class CreateDoorsTable1710424800000 implements MigrationInterface {
             type: 'varchar',
           },
           {
-            name: 'externalId',
+            name: 'external_id',
             type: 'varchar',
             isUnique: true,
           },
           {
-            name: 'createdAt',
+            name: 'created_at',
             type: 'timestamp',
             default: 'now()',
           },
           {
-            name: 'updatedAt',
+            name: 'updated_at',
             type: 'timestamp',
             default: 'now()',
           },
@@ -76,7 +76,7 @@ export class CreateDoorsTable1710424800000 implements MigrationInterface {
     // Создаем индексы для оптимизации поиска
     await queryRunner.query(`
       CREATE INDEX doors_category_idx ON doors (category);
-      CREATE INDEX doors_external_id_idx ON doors ("external_id");
+      CREATE INDEX doors_external_id_idx ON doors (external_id);
     `);
   }
 
